@@ -1,17 +1,21 @@
 # 01 - Vision
 
-# Personal Productivity System (DailyOS)
+# Personal Productivity System (LifeBoard)
 
 ## 1. Overview
-DailyOS is a local-first web application for personal task management, planning, tracking and productivity analytics. It is designed to replace spreadsheet-based planning by providing a structured dashboard while keeping all data on the user's own machine.
+
+LifeBoard is a local-first web application for personal task management, planning, tracking and productivity analytics. It is designed to replace spreadsheet-based planning by providing a structured dashboard while keeping all data on the user's own machine.
 
 ## 2. Problem Statement
+
 Many planning solutions depend on cloud services, subscriptions, or Internet connectivity. Users who only need a personal planner often pay recurring fees or lose flexibility.
 
 ## 3. Vision
+
 Build a lightweight, extensible, local-first productivity platform that helps users plan, execute and review their work every day.
 
 ## 4. Objectives
+
 - Manage daily tasks
 - Plan tomorrow's work
 - Track productivity
@@ -22,6 +26,7 @@ Build a lightweight, extensible, local-first productivity platform that helps us
 ## 5. Scope
 
 ### In Scope
+
 - Calendar (365-day navigation)
 - Daily planner
 - Todo management
@@ -32,8 +37,11 @@ Build a lightweight, extensible, local-first productivity platform that helps us
 - Local database
 - Backup & restore
 - Dark/Light theme
+- Eye-catching UI
+- Set up and diksplay countdown to key milestones.
 
 ### Out of Scope
+
 - Team collaboration
 - Cloud synchronization
 - Mobile application
@@ -41,6 +49,7 @@ Build a lightweight, extensible, local-first productivity platform that helps us
 - Social features
 
 ## 6. Target Users
+
 - Students
 - Office workers
 - Freelancers
@@ -48,6 +57,7 @@ Build a lightweight, extensible, local-first productivity platform that helps us
 - Anyone wanting offline planning
 
 ## 7. Product Values
+
 - Local-first
 - Privacy
 - Simplicity
@@ -55,6 +65,7 @@ Build a lightweight, extensible, local-first productivity platform that helps us
 - Extensibility
 
 ## 8. Functional Goals
+
 1. Accurate calendar
 2. Task management
 3. Daily planning
@@ -63,6 +74,7 @@ Build a lightweight, extensible, local-first productivity platform that helps us
 6. Analytics
 
 ## 9. Non-functional Goals
+
 - Fast startup (<2s)
 - Offline operation
 - Responsive UI
@@ -70,12 +82,14 @@ Build a lightweight, extensible, local-first productivity platform that helps us
 - Easy backup
 
 ## 10. Technology Vision
+
 Frontend: React + TypeScript + Vite
 Backend: ASP.NET Core 8 Web API
-Database: SQLite
+Database: mySQL
 Deployment: Docker Compose (optional)
 
 ## 11. Future Roadmap
+
 - Cloud sync
 - Multi-device
 - Plugins
