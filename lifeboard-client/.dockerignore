@@ -1,0 +1,56 @@
+﻿# =============================================================
+#  LifeBoard Frontend — .dockerignore (lifeboard-client/)
+#  Applied when: docker build context = ./lifeboard-client
+#  Goal: send only source files to Docker daemon — no bloat
+# =============================================================
+
+# ── The big one ───────────────────────────────────────────────
+node_modules/
+
+# ── Build outputs (rebuilt inside Docker) ─────────────────────
+dist/
+dist-ssr/
+.vite/
+
+# ── Environment / Secrets ─────────────────────────────────────
+# Never bake secrets into image — pass via --build-arg or env
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# ── Test files (not needed in production image) ───────────────
+playwright/
+playwright-report/
+test-results/
+coverage/
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# ── Dev & Editor configs ──────────────────────────────────────
+.vscode/
+.idea/
+*.sw?
+.eslintcache
+.stylelintcache
+
+# ── Docs & Non-essential ──────────────────────────────────────
+*.md
+LICENSE
+
+# ── Git ───────────────────────────────────────────────────────
+.git/
+.gitignore
+.gitattributes
+
+# ── Logs & Cache ──────────────────────────────────────────────
+*.log
+npm-debug.log*
+.cache/
+
+# ── OS ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
