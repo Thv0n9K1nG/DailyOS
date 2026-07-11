@@ -2,6 +2,8 @@
 
 > Local-first web app for task management, habit tracking, focus sessions & analytics.
 
+<img src="overview.png" alt="project overview" />
+
 ## Tech Stack
 
 | Layer    | Technology                  |
