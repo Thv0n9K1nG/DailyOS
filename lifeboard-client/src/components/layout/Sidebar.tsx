@@ -1,5 +1,6 @@
-﻿import React from "react";
+import React from "react";
 import { NavLink } from "react-router-dom";
+import logoUrl from "@/assets/logo.png";
 import {
   LayoutDashboard, Calendar, CheckSquare, Sunrise, Repeat, Target,
   Timer, Clock, FileText, Smile, BarChart2, TrendingUp, Search,
@@ -33,11 +34,11 @@ export const Sidebar: React.FC = () => (
   }}>
     {/* Logo */}
     <div style={{ padding: "var(--space-3) var(--space-3) var(--space-6)", display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{
-        width: 32, height: 32, borderRadius: "var(--radius-md)",
-        background: "var(--accent-primary)", display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 18, boxShadow: "var(--shadow-glow)",
-      }}>⚡</div>
+      <img
+        src={logoUrl}
+        alt="LifeBoard logo"
+        style={{ width: 32, height: 32, borderRadius: "var(--radius-md)", objectFit: "cover" }}
+      />
       <span style={{ fontSize: "var(--text-md)", fontWeight: 700, color: "var(--text-primary)" }}>LifeBoard</span>
     </div>
 

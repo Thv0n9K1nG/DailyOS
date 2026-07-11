@@ -1,8 +1,8 @@
-﻿# LifeBoard — Personal Productivity System
+# LifeBoard — Personal Productivity System
 
 > Local-first web app for task management, habit tracking, focus sessions & analytics.
 
-<img src="overview.png" alt="project overview" />
+<img src="docs/overview.png" alt="LifeBoard overview" />
 
 ## Tech Stack
 
