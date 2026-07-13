@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using LifeBoard.API.Models.DTOs;
 using LifeBoard.API.Services.Interfaces;
 
 namespace LifeBoard.API.Controllers;
@@ -7,6 +8,31 @@ namespace LifeBoard.API.Controllers;
 [Route("api/v1/tags")]
 public class TagsController(ILogger<TagsController> logger, ITagService service) : ControllerBase
 {
-    // TODO: Implement endpoints
-    // Reference: docs/09-API-Specification.md — section for /tags
+    private readonly ITagService _service = service;
+
+    [HttpGet]
+    public async Task<IActionResult> GetAll()
+    {
+        return Ok(await _service.GetAllAsync());
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateTagDto dto)
+    {
+        var tag = await _service.CreateAsync(dto);
+        return Created("", tag);
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateTagDto dto)
+    {
+        return Ok(await _service.UpdateAsync(id, dto));
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        await _service.DeleteAsync(id);
+        return NoContent();
+    }
 }

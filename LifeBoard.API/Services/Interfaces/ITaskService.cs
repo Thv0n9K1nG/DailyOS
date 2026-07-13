@@ -1,4 +1,15 @@
-﻿namespace LifeBoard.API.Services.Interfaces;
+﻿using LifeBoard.API.Models.DTOs;
 
-// TODO: Define methods based on docs/09-API-Specification.md and docs/06-SRS.md
-public interface ITaskService { }
+namespace LifeBoard.API.Services.Interfaces;
+
+public interface ITaskService
+{
+    Task<object> GetTasksAsync(string? status, string? priority, DateTime? plannedDate, string? search, int page = 1, int pageSize = 50);
+    Task<TaskDto?> GetByIdAsync(int id);
+    Task<TaskDto> CreateAsync(CreateTaskDto dto);
+    Task<TaskDto> UpdateAsync(int id, UpdateTaskDto dto);
+    Task<TaskDto> CompleteAsync(int id);
+    Task<TaskDto> UncompleteAsync(int id);
+    Task<TaskDto> ArchiveAsync(int id);
+    Task DeleteAsync(int id);
+}

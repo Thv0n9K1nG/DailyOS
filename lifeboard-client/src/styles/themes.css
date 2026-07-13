@@ -1,73 +1,108 @@
-﻿/* ── DARK THEME (default) ─────────────────────────────────── */
+/* ── PALETTE EXTRACTED FROM LOGO ─────────────────────────────
+   Logo:  Navy #1F2E4D | Blue #3D8EF0 | Teal #52D7BF
+          Sky  #69A7FF | Orange #FFB347 | Purple #9270FF
+   ──────────────────────────────────────────────────────────── */
+
+/* ── DARK THEME (default) ─────────────────────────────────── */
 :root, :root[data-theme="dark"] {
-  --bg-base:     #0F1117;
-  --bg-surface:  #1A1D27;
-  --bg-elevated: #22263A;
-  --bg-overlay:  #2C3150;
+  /* Backgrounds — navy tone from logo */
+  --bg-base:     #0D1525;
+  --bg-surface:  #131E33;
+  --bg-elevated: #1A2845;
+  --bg-overlay:  #223060;
 
-  --border-subtle:  #2A2D3E;
-  --border-default: #363A52;
-  --border-strong:  #4A4F6A;
+  /* Borders */
+  --border-subtle:  #1F2E4D;
+  --border-default: #2A3D6A;
+  --border-strong:  #3D5590;
 
-  --text-primary:   #E8EAF6;
-  --text-secondary: #9EA3BE;
-  --text-muted:     #5C6280;
-  --text-inverse:   #0F1117;
+  /* Text */
+  --text-primary:   #E8EDF8;
+  --text-secondary: #94A8CC;
+  --text-muted:     #4A6090;
+  --text-inverse:   #0D1525;
 
-  --accent-primary: #7C6BFF;
-  --accent-hover:   #6B5AEE;
-  --accent-subtle:  #2D2960;
-  --accent-glow:    rgba(124, 107, 255, 0.25);
+  /* Accent — blue from "Board" wordmark */
+  --accent-primary: #3D8EF0;
+  --accent-hover:   #2B7AE0;
+  --accent-subtle:  #1A2E5C;
+  --accent-glow:    rgba(61, 142, 240, 0.22);
 
-  --color-success: #34D399;
-  --color-warning: #FBBF24;
-  --color-danger:  #F87171;
-  --color-info:    #60A5FA;
+  /* Semantic — pulled directly from logo icon cards */
+  --color-success: #52D7BF;  /* teal card */
+  --color-warning: #FFB347;  /* orange card */
+  --color-danger:  #F87171;  /* red (universal) */
+  --color-info:    #69A7FF;  /* sky blue card */
+  --color-purple:  #9270FF;  /* purple card */
 
+  /* Priority */
   --priority-high:   #F87171;
-  --priority-medium: #FBBF24;
-  --priority-low:    #34D399;
+  --priority-medium: #FFB347;
+  --priority-low:    #52D7BF;
 
-  --mood-1: #F87171; --mood-2: #FB923C; --mood-3: #FBBF24;
-  --mood-4: #34D399; --mood-5: #818CF8;
+  /* Mood (1-5) */
+  --mood-1: #F87171;
+  --mood-2: #FFB347;
+  --mood-3: #69A7FF;
+  --mood-4: #52D7BF;
+  --mood-5: #9270FF;
 
-  --heatmap-0: #1A1D27; --heatmap-1: #2D2960;
-  --heatmap-2: #4B3FAA; --heatmap-3: #6B5AEE; --heatmap-4: #7C6BFF;
+  /* Heatmap — navy → blue gradient */
+  --heatmap-0: #131E33;
+  --heatmap-1: #1A3060;
+  --heatmap-2: #1F5299;
+  --heatmap-3: #2B7AE0;
+  --heatmap-4: #3D8EF0;
 }
 
 /* ── LIGHT THEME ──────────────────────────────────────────── */
 :root[data-theme="light"] {
-  --bg-base:     #F8F9FC;
+  /* Backgrounds — light blue-white */
+  --bg-base:     #F0F4FC;
   --bg-surface:  #FFFFFF;
-  --bg-elevated: #F0F2FA;
-  --bg-overlay:  #E8EBF5;
+  --bg-elevated: #E8EEF8;
+  --bg-overlay:  #DCE5F5;
 
-  --border-subtle:  #E2E5F0;
-  --border-default: #CDD2E8;
-  --border-strong:  #A8AFCF;
+  /* Borders */
+  --border-subtle:  #D0DCEE;
+  --border-default: #B8CADF;
+  --border-strong:  #8AAFD0;
 
-  --text-primary:   #1A1D2E;
-  --text-secondary: #5C6280;
-  --text-muted:     #9EA3BE;
-  --text-inverse:   #F8F9FC;
+  /* Text */
+  --text-primary:   #1F2E4D;
+  --text-secondary: #4A6090;
+  --text-muted:     #8AAFD0;
+  --text-inverse:   #F0F4FC;
 
-  --accent-primary: #6B5AEE;
-  --accent-hover:   #5A4ADD;
-  --accent-subtle:  #EAE8FF;
-  --accent-glow:    rgba(107, 90, 238, 0.2);
+  /* Accent */
+  --accent-primary: #2B7AE0;
+  --accent-hover:   #1F62C0;
+  --accent-subtle:  #D0E4FF;
+  --accent-glow:    rgba(43, 122, 224, 0.18);
 
-  --color-success: #059669;
-  --color-warning: #D97706;
+  /* Semantic */
+  --color-success: #0D9B85;
+  --color-warning: #E08C20;
   --color-danger:  #DC2626;
-  --color-info:    #2563EB;
+  --color-info:    #2B7AE0;
+  --color-purple:  #7244DD;
 
+  /* Priority */
   --priority-high:   #DC2626;
-  --priority-medium: #D97706;
-  --priority-low:    #059669;
+  --priority-medium: #E08C20;
+  --priority-low:    #0D9B85;
 
-  --mood-1: #DC2626; --mood-2: #EA580C; --mood-3: #D97706;
-  --mood-4: #059669; --mood-5: #6B5AEE;
+  /* Mood */
+  --mood-1: #DC2626;
+  --mood-2: #E08C20;
+  --mood-3: #2B7AE0;
+  --mood-4: #0D9B85;
+  --mood-5: #7244DD;
 
-  --heatmap-0: #E8EBF5; --heatmap-1: #C7C0FF;
-  --heatmap-2: #9F96FF; --heatmap-3: #7C6BFF; --heatmap-4: #5A4ADD;
+  /* Heatmap */
+  --heatmap-0: #E8EEF8;
+  --heatmap-1: #B8D0F0;
+  --heatmap-2: #6DAAE8;
+  --heatmap-3: #2B7AE0;
+  --heatmap-4: #1F2E4D;
 }

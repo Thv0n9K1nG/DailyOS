@@ -1,4 +1,12 @@
-﻿namespace LifeBoard.API.Repositories.Interfaces;
+﻿using LifeBoard.API.Models.Entities;
 
-// TODO: Define CRUD methods matching docs/07-ERD-Database-Design.md queries
-public interface ITagRepository { }
+namespace LifeBoard.API.Repositories.Interfaces;
+
+public interface ITagRepository
+{
+    Task<IEnumerable<TagEntity>> GetAllAsync();
+    Task<TagEntity?> GetByIdAsync(int id);
+    Task<TagEntity> CreateAsync(TagEntity tag);
+    Task<TagEntity> UpdateAsync(TagEntity tag);
+    Task DeleteAsync(int id);
+}

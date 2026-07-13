@@ -1,4 +1,11 @@
-﻿namespace LifeBoard.API.Services.Interfaces;
+﻿using LifeBoard.API.Models.DTOs;
 
-// TODO: Define methods based on docs/09-API-Specification.md and docs/06-SRS.md
-public interface ITagService { }
+namespace LifeBoard.API.Services.Interfaces;
+
+public interface ITagService
+{
+    Task<IEnumerable<TagDto>> GetAllAsync();
+    Task<TagDto> CreateAsync(CreateTagDto dto);
+    Task<TagDto> UpdateAsync(int id, UpdateTagDto dto);
+    Task DeleteAsync(int id);
+}

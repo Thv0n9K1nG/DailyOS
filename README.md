@@ -5,7 +5,6 @@
 <img src="docs/overview.png" alt="LifeBoard overview" />
 
 ## Tech Stack
-
 | Layer    | Technology                  |
 |----------|-----------------------------|
 | Frontend | React 18 + TypeScript + Vite |
