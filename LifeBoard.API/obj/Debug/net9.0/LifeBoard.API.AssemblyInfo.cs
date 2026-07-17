@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LifeBoard.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ad403352455384717b30b4683912be6acdd1288d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8e5f7d614ef1fdd49832a117f73054d9567fcf69")]
 [assembly: System.Reflection.AssemblyProductAttribute("LifeBoard.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LifeBoard.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

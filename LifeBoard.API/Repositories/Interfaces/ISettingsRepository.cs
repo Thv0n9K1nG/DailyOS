@@ -1,4 +1,9 @@
-﻿namespace LifeBoard.API.Repositories.Interfaces;
+﻿using LifeBoard.API.Models.Entities;
 
-// TODO: Define CRUD methods matching docs/07-ERD-Database-Design.md queries
-public interface ISettingsRepository { }
+namespace LifeBoard.API.Repositories.Interfaces;
+
+public interface ISettingsRepository
+{
+    Task<SettingsEntity> GetAsync();
+    Task<SettingsEntity> UpdateAsync(SettingsEntity settings);
+}

@@ -1,4 +1,4 @@
-﻿using MySqlConnector;
+using MySqlConnector;
 using System.Data;
 
 namespace LifeBoard.API.Infrastructure;
@@ -29,6 +29,24 @@ public class DbConnectionFactory(IConfiguration config, ILogger<DbConnectionFact
                 cmd.CommandText = statement;
                 await cmd.ExecuteNonQueryAsync();
             }
+
+            // Check if splits column exists on focus_sessions, if not, add it
+            try
+            {
+                cmd.CommandText = "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'focus_sessions' AND COLUMN_NAME = 'splits'";
+                var columnCount = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+                if (columnCount == 0)
+                {
+                    cmd.CommandText = "ALTER TABLE focus_sessions ADD COLUMN splits TEXT NULL;";
+                    await cmd.ExecuteNonQueryAsync();
+                    logger.LogInformation("Added splits column to focus_sessions table.");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to run custom migration for focus_sessions.splits column.");
+            }
+
             logger.LogInformation("Database migration completed successfully.");
         }
         catch (Exception ex) { logger.LogError(ex, "Database migration failed."); }

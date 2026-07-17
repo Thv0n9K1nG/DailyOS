@@ -1,4 +1,12 @@
-﻿namespace LifeBoard.API.Services.Interfaces;
+using LifeBoard.API.Models.DTOs.Analytics;
 
-// TODO: Define methods based on docs/09-API-Specification.md and docs/06-SRS.md
-public interface IAnalyticsService { }
+namespace LifeBoard.API.Services.Interfaces;
+
+public interface IAnalyticsService
+{
+    Task<WeeklyAnalyticsDto> GetWeeklyAsync(DateTime weekStart);
+    Task<MonthlyAnalyticsDto> GetMonthlyAsync(int year, int month);
+    Task<YearlyAnalyticsDto> GetYearlyAsync(int year);
+    Task<StatisticsDto> GetStatisticsAsync(DateTime from, DateTime to);
+}
+

@@ -1,4 +1,11 @@
-﻿namespace LifeBoard.API.Services.Interfaces;
+﻿using LifeBoard.API.Models.DTOs;
 
-// TODO: Define methods based on docs/09-API-Specification.md and docs/06-SRS.md
-public interface ICountdownService { }
+namespace LifeBoard.API.Services.Interfaces;
+
+public interface ICountdownService
+{
+    Task<IEnumerable<CountdownDto>> GetAllAsync();
+    Task<CountdownDto> CreateAsync(CreateCountdownDto dto);
+    Task<CountdownDto> UpdateAsync(int id, UpdateCountdownDto dto);
+    Task DeleteAsync(int id);
+}

@@ -1,4 +1,14 @@
-﻿namespace LifeBoard.API.Services.Interfaces;
+using LifeBoard.API.Models.DTOs;
 
-// TODO: Define methods based on docs/09-API-Specification.md and docs/06-SRS.md
-public interface IGoalService { }
+namespace LifeBoard.API.Services.Interfaces;
+
+public interface IGoalService
+{
+    Task<IEnumerable<GoalDto>> GetAllAsync(string? status = null);
+    Task<GoalDto?> GetByIdAsync(int id);
+    Task<GoalDto> CreateAsync(CreateGoalDto dto);
+    Task<GoalDto> UpdateAsync(int id, UpdateGoalDto dto);
+    Task<GoalDto> UpdateProgressAsync(int id, UpdateGoalProgressDto dto);
+    Task DeleteAsync(int id);
+}
+

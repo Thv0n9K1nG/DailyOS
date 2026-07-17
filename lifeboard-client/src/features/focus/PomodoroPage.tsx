@@ -1,7 +1,5 @@
 ﻿import React from "react";
-
-// TODO: Implement PomodoroPage
-// Focus timer 25/5
+import { FocusPage } from "./FocusPage";
 
 export const PomodoroPage: React.FC = () => {
   return (
@@ -11,20 +9,14 @@ export const PomodoroPage: React.FC = () => {
         borderRadius: "var(--radius-lg)", border: "1px solid var(--border-subtle)",
         marginBottom: "var(--space-5)",
       }}>
-        <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--text-primary)", marginBottom: "var(--space-2)" }}>
+        <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--text-primary)", marginBottom: "var(--space-2)", margin: "0 0 var(--space-2)" }}>
           Pomodoro
         </h2>
-        <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)" }}>
-          Focus timer 25/5
+        <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: 0 }}>
+          Tập trung theo chu kỳ (25 phút làm việc, 5 phút nghỉ ngơi)
         </p>
       </div>
-      <div style={{
-        padding: "var(--space-10)", textAlign: "center",
-        color: "var(--text-muted)", fontSize: "var(--text-sm)",
-        border: "1px dashed var(--border-subtle)", borderRadius: "var(--radius-lg)",
-      }}>
-        🚧 Đang phát triển — PomodoroPage
-      </div>
+      <FocusPage defaultMode="pomodoro" />
     </div>
   );
 };

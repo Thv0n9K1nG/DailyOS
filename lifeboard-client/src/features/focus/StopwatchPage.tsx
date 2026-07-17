@@ -1,7 +1,5 @@
 ﻿import React from "react";
-
-// TODO: Implement StopwatchPage
-// Đo thời gian tập trung
+import { FocusPage } from "./FocusPage";
 
 export const StopwatchPage: React.FC = () => {
   return (
@@ -11,20 +9,14 @@ export const StopwatchPage: React.FC = () => {
         borderRadius: "var(--radius-lg)", border: "1px solid var(--border-subtle)",
         marginBottom: "var(--space-5)",
       }}>
-        <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--text-primary)", marginBottom: "var(--space-2)" }}>
+        <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--text-primary)", marginBottom: "var(--space-2)", margin: "0 0 var(--space-2)" }}>
           Stopwatch
         </h2>
-        <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)" }}>
-          Đo thời gian tập trung
+        <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: 0 }}>
+          Theo dõi thời gian tập trung làm việc tự do
         </p>
       </div>
-      <div style={{
-        padding: "var(--space-10)", textAlign: "center",
-        color: "var(--text-muted)", fontSize: "var(--text-sm)",
-        border: "1px dashed var(--border-subtle)", borderRadius: "var(--radius-lg)",
-      }}>
-        🚧 Đang phát triển — StopwatchPage
-      </div>
+      <FocusPage defaultMode="stopwatch" />
     </div>
   );
 };

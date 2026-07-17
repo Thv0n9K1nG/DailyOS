@@ -1,4 +1,11 @@
-﻿namespace LifeBoard.API.Repositories.Interfaces;
+﻿using LifeBoard.API.Models.Entities;
 
-// TODO: Define CRUD methods matching docs/07-ERD-Database-Design.md queries
-public interface IDailyNoteRepository { }
+namespace LifeBoard.API.Repositories.Interfaces;
+
+public interface IDailyNoteRepository
+{
+    Task<DailyNoteEntity?> GetByDateAsync(DateTime date);
+    Task<IEnumerable<DailyNoteEntity>> GetAllAsync();
+    Task<DailyNoteEntity> UpsertAsync(DailyNoteEntity note);
+    Task DeleteAsync(int id);
+}

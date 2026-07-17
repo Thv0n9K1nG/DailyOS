@@ -1,4 +1,15 @@
-﻿namespace LifeBoard.API.Repositories.Interfaces;
+﻿using LifeBoard.API.Models.Entities;
 
-// TODO: Define CRUD methods matching docs/07-ERD-Database-Design.md queries
-public interface IHabitRepository { }
+namespace LifeBoard.API.Repositories.Interfaces;
+
+public interface IHabitRepository
+{
+    Task<IEnumerable<HabitEntity>> GetAllActiveAsync();
+    Task<HabitEntity?> GetByIdAsync(int id);
+    Task<HabitEntity> CreateAsync(HabitEntity habit);
+    Task<HabitEntity> UpdateAsync(HabitEntity habit);
+    Task DeleteAsync(int id);
+    Task DeactivateAsync(int id);
+    Task<IEnumerable<HabitCheckInEntity>> GetCheckinsAsync(int habitId, DateTime from, DateTime to);
+    Task UpsertCheckinAsync(int habitId, DateTime date, bool isCompleted);
+}

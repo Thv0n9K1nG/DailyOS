@@ -1,4 +1,9 @@
-﻿namespace LifeBoard.API.Services.Interfaces;
+﻿using LifeBoard.API.Models.DTOs;
 
-// TODO: Define methods based on docs/09-API-Specification.md and docs/06-SRS.md
-public interface ISettingsService { }
+namespace LifeBoard.API.Services.Interfaces;
+
+public interface ISettingsService
+{
+    Task<SettingsDto> GetAsync();
+    Task<SettingsDto> UpdateAsync(SettingsDto settings);
+}

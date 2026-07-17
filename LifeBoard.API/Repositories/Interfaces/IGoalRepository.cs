@@ -1,4 +1,12 @@
-﻿namespace LifeBoard.API.Repositories.Interfaces;
+using LifeBoard.API.Models.Entities;
 
-// TODO: Define CRUD methods matching docs/07-ERD-Database-Design.md queries
-public interface IGoalRepository { }
+namespace LifeBoard.API.Repositories.Interfaces;
+
+public interface IGoalRepository
+{
+    Task<IEnumerable<GoalEntity>> GetAllAsync(string? status = null);
+    Task<GoalEntity?> GetByIdAsync(int id);
+    Task<GoalEntity> CreateAsync(GoalEntity goal);
+    Task<GoalEntity> UpdateAsync(GoalEntity goal);
+    Task DeleteAsync(int id);
+}

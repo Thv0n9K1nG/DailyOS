@@ -1,13 +1,24 @@
-﻿using LifeBoard.API.Services.Interfaces;
+﻿using LifeBoard.API.Models.DTOs;
+using LifeBoard.API.Models.Entities;
 using LifeBoard.API.Repositories.Interfaces;
+using LifeBoard.API.Services.Interfaces;
 
 namespace LifeBoard.API.Services;
 
-// TODO: Implement — see docs/08-SDD.md and docs/06-SRS.md
-public class SettingsService : ISettingsService
+public class SettingsService(ISettingsRepository repository) : ISettingsService
 {
-    private readonly ISettingsRepository _repository;
-    private readonly ILogger<SettingsService> _logger;
-    public SettingsService(ISettingsRepository repository, ILogger<SettingsService> logger)
-    { _repository = repository; _logger = logger; }
+    private readonly ISettingsRepository _repository = repository;
+
+    public async Task<SettingsDto> GetAsync()
+    {
+        var e = await _repository.GetAsync();
+        return new SettingsDto { Theme = e.Theme, PomodoroFocusMinutes = e.PomodoroFocusMinutes, PomodoroBreakMinutes = e.PomodoroBreakMinutes, PomodoroRounds = e.PomodoroRounds, HabitGracePeriodDays = e.HabitGracePeriodDays, Language = e.Language };
+    }
+
+    public async Task<SettingsDto> UpdateAsync(SettingsDto dto)
+    {
+        var e = new SettingsEntity { Theme = dto.Theme, PomodoroFocusMinutes = dto.PomodoroFocusMinutes, PomodoroBreakMinutes = dto.PomodoroBreakMinutes, PomodoroRounds = dto.PomodoroRounds, HabitGracePeriodDays = dto.HabitGracePeriodDays, Language = dto.Language };
+        e = await _repository.UpdateAsync(e);
+        return new SettingsDto { Theme = e.Theme, PomodoroFocusMinutes = e.PomodoroFocusMinutes, PomodoroBreakMinutes = e.PomodoroBreakMinutes, PomodoroRounds = e.PomodoroRounds, HabitGracePeriodDays = e.HabitGracePeriodDays, Language = e.Language };
+    }
 }

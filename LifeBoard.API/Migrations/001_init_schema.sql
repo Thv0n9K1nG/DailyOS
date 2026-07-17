@@ -1,4 +1,4 @@
-﻿-- LifeBoard Database Schema v1.0
+-- LifeBoard Database Schema v1.0
 -- Run order: tables with no FK first, then dependent tables
 
 CREATE DATABASE IF NOT EXISTS lifeboard
@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS focus_sessions (
     end_time         DATETIME     NOT NULL,
     duration_seconds INT          NOT NULL,
     session_date     DATE         NOT NULL,
+    splits           TEXT         NULL,
     created_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     INDEX idx_fs_session_date (session_date),

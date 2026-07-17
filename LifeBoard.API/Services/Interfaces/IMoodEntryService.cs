@@ -1,4 +1,11 @@
-﻿namespace LifeBoard.API.Services.Interfaces;
+﻿using LifeBoard.API.Models.DTOs;
 
-// TODO: Define methods based on docs/09-API-Specification.md and docs/06-SRS.md
-public interface IMoodEntryService { }
+namespace LifeBoard.API.Services.Interfaces;
+
+public interface IMoodEntryService
+{
+    Task<MoodEntryDto?> GetByDateAsync(DateTime date);
+    Task<IEnumerable<MoodEntryDto>> GetAllAsync();
+    Task<MoodEntryDto> UpsertAsync(UpsertMoodEntryDto dto);
+    Task DeleteAsync(int id);
+}

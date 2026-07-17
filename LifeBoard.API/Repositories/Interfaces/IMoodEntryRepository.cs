@@ -1,4 +1,11 @@
-﻿namespace LifeBoard.API.Repositories.Interfaces;
+﻿using LifeBoard.API.Models.Entities;
 
-// TODO: Define CRUD methods matching docs/07-ERD-Database-Design.md queries
-public interface IMoodEntryRepository { }
+namespace LifeBoard.API.Repositories.Interfaces;
+
+public interface IMoodEntryRepository
+{
+    Task<MoodEntryEntity?> GetByDateAsync(DateTime date);
+    Task<IEnumerable<MoodEntryEntity>> GetAllAsync();
+    Task<MoodEntryEntity> UpsertAsync(MoodEntryEntity entry);
+    Task DeleteAsync(int id);
+}

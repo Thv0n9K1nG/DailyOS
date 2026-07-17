@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle, Circle, Plus, FileText, Clock } from "lucide-react";
+import { ArrowLeft, CheckCircle, Circle, Plus, FileText, Clock, Smile } from "lucide-react";
 import { useTasks, useCompleteTask, useUncompleteTask, useCreateTask } from "../tasks/hooks/useTasks";
 import { Button } from "../../components/ui/Button";
 import { SkeletonList } from "../../components/ui/SkeletonCard";
 import { TaskFormModal } from "../tasks/TaskFormModal";
+import { useDailyNote, useUpsertDailyNote } from "../notes/hooks/useNotes";
+import { useMoodEntry, useUpsertMoodEntry } from "../mood/hooks/useMood";
+import ReactMarkdown from "react-markdown";
 
 function formatDateDisplay(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
@@ -18,16 +21,41 @@ const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
   low:    { label: "Thấp",    color: "var(--priority-low)" },
 };
 
+const MOOD_EMOJIS = [
+  { score: 1, emoji: "😞", label: "Rất tệ" },
+  { score: 2, emoji: "😕", label: "Tệ" },
+  { score: 3, emoji: "😐", label: "Bình thường" },
+  { score: 4, emoji: "🙂", label: "Tốt" },
+  { score: 5, emoji: "😄", label: "Tuyệt vời" },
+];
+
 export const DailyDetailPage: React.FC = () => {
   const { date } = useParams<{ date: string }>();
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [note, setNote] = useState("");
+  const [noteContent, setNoteContent] = useState("");
+  const [noteTab, setNoteTab] = useState<'edit' | 'preview'>('edit');
+  const [saveStatus, setSaveStatus] = useState("Đã lưu");
 
   const { data, isLoading } = useTasks({ plannedDate: date });
   const completeTask = useCompleteTask();
   const uncompleteTask = useUncompleteTask();
   const createTask = useCreateTask();
+
+  // Stage 3 Notes & Mood Queries
+  const { data: dbNote, isLoading: isLoadingNote } = useDailyNote(date || "");
+  const upsertNote = useUpsertDailyNote();
+
+  const { data: dbMood, isLoading: isLoadingMood } = useMoodEntry(date || "");
+  const upsertMood = useUpsertMoodEntry();
+
+  useEffect(() => {
+    if (dbNote) {
+      setNoteContent(dbNote.content || "");
+    } else {
+      setNoteContent("");
+    }
+  }, [dbNote]);
 
   const tasks = data?.data || [];
   const done = tasks.filter(t => t.status === "done").length;
@@ -40,6 +68,18 @@ export const DailyDetailPage: React.FC = () => {
       { ...payload, plannedDate: new Date(date).toISOString() },
       { onSuccess: () => setIsModalOpen(false) }
     );
+  };
+
+  const handleMoodSelect = (score: number) => {
+    upsertMood.mutate({ entryDate: date, score });
+  };
+
+  const handleNoteBlur = () => {
+    setSaveStatus("Đang lưu...");
+    upsertNote.mutate({ noteDate: date, content: noteContent }, {
+      onSuccess: () => setSaveStatus("Đã lưu"),
+      onError: () => setSaveStatus("Lỗi lưu!")
+    });
   };
 
   return (
@@ -123,7 +163,7 @@ export const DailyDetailPage: React.FC = () => {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "var(--space-5)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "var(--space-5)" }}>
         {/* Tasks */}
         <div
           style={{
@@ -142,6 +182,7 @@ export const DailyDetailPage: React.FC = () => {
               display: "flex",
               alignItems: "center",
               gap: "var(--space-2)",
+              margin: "0 0 var(--space-4)"
             }}
           >
             <Clock size={16} style={{ color: "var(--accent-primary)" }} />
@@ -244,66 +285,174 @@ export const DailyDetailPage: React.FC = () => {
           )}
         </div>
 
-        {/* Notes panel */}
-        <div
-          style={{
-            background: "var(--bg-surface)",
-            borderRadius: "var(--radius-lg)",
-            border: "1px solid var(--border-subtle)",
-            padding: "var(--space-5)",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <h3
+        {/* Notes & Mood panel */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+          
+          {/* Mood Panel */}
+          <div
             style={{
-              fontSize: "var(--text-md)",
-              fontWeight: 600,
-              color: "var(--text-primary)",
-              marginBottom: "var(--space-4)",
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--space-2)",
+              background: "var(--bg-surface)",
+              borderRadius: "var(--radius-lg)",
+              border: "1px solid var(--border-subtle)",
+              padding: "var(--space-5)",
             }}
           >
-            <FileText size={16} style={{ color: "var(--color-warning)" }} />
-            Ghi chú
-            <span
+            <h3
               style={{
-                fontSize: "var(--text-xs)",
-                color: "var(--text-muted)",
-                fontWeight: 400,
-                marginLeft: "auto",
+                fontSize: "var(--text-md)",
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                marginBottom: "var(--space-4)",
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--space-2)",
+                margin: "0 0 var(--space-4)"
               }}
             >
-              Stage 3
-            </span>
-          </h3>
-          <textarea
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            placeholder="Viết ghi chú cho ngày này... (Markdown sẽ được hỗ trợ ở Stage 3)"
+              <Smile size={16} style={{ color: "var(--accent-primary)" }} />
+              Tâm trạng hôm nay
+            </h3>
+            {isLoadingMood ? (
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Đang tải...</div>
+            ) : (
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-1)" }}>
+                {MOOD_EMOJIS.map(m => {
+                  const isSelected = dbMood?.score === m.score;
+                  return (
+                    <button
+                      key={m.score}
+                      onClick={() => handleMoodSelect(m.score)}
+                      title={m.label}
+                      style={{
+                        flex: 1,
+                        background: isSelected ? "var(--accent-subtle)" : "transparent",
+                        border: isSelected ? "1px solid var(--accent-primary)" : "1px solid transparent",
+                        borderRadius: "var(--radius-md)",
+                        padding: "6px 0",
+                        fontSize: "24px",
+                        cursor: "pointer",
+                        transition: "all 150ms ease",
+                      }}
+                      onMouseEnter={e => { if(!isSelected) e.currentTarget.style.background = "var(--bg-overlay)"; }}
+                      onMouseLeave={e => { if(!isSelected) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {m.emoji}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Notes Panel */}
+          <div
             style={{
-              flex: 1,
-              minHeight: 200,
-              background: "var(--bg-overlay)",
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-md)",
-              color: "var(--text-primary)",
-              fontSize: "var(--text-sm)",
-              padding: "var(--space-3)",
-              resize: "vertical",
-              outline: "none",
-              fontFamily: "var(--font-sans)",
-              lineHeight: 1.6,
-              transition: "border-color 150ms ease",
+              background: "var(--bg-surface)",
+              borderRadius: "var(--radius-lg)",
+              border: "1px solid var(--border-subtle)",
+              padding: "var(--space-5)",
+              display: "flex",
+              flexDirection: "column",
             }}
-            onFocus={e => (e.currentTarget.style.borderColor = "var(--accent-primary)")}
-            onBlur={e => (e.currentTarget.style.borderColor = "var(--border-default)")}
-          />
-          <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: "var(--space-2)", margin: "var(--space-2) 0 0" }}>
-            💡 Tính năng lưu sẽ hoàn thiện ở Stage 3
-          </p>
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+              <h3
+                style={{
+                  fontSize: "var(--text-md)",
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--space-2)",
+                  margin: 0
+                }}
+              >
+                <FileText size={16} style={{ color: "var(--color-warning)" }} />
+                Ghi chú ngày
+              </h3>
+              <div style={{ display: "flex", gap: "2px", background: "var(--bg-overlay)", borderRadius: "6px", padding: "2px" }}>
+                <button
+                  onClick={() => setNoteTab('edit')}
+                  style={{
+                    border: "none", background: noteTab === 'edit' ? "var(--bg-surface)" : "none",
+                    color: noteTab === 'edit' ? "var(--text-primary)" : "var(--text-muted)",
+                    padding: "3px 8px", fontSize: "10px", fontWeight: 600, borderRadius: "4px", cursor: "pointer"
+                  }}
+                >
+                  Sửa
+                </button>
+                <button
+                  onClick={() => setNoteTab('preview')}
+                  style={{
+                    border: "none", background: noteTab === 'preview' ? "var(--bg-surface)" : "none",
+                    color: noteTab === 'preview' ? "var(--text-primary)" : "var(--text-muted)",
+                    padding: "3px 8px", fontSize: "10px", fontWeight: 600, borderRadius: "4px", cursor: "pointer"
+                  }}
+                >
+                  Xem
+                </button>
+              </div>
+            </div>
+
+            {isLoadingNote ? (
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Đang tải...</div>
+            ) : noteTab === 'edit' ? (
+              <textarea
+                value={noteContent}
+                onChange={e => setNoteContent(e.target.value)}
+                placeholder="Viết ghi chú ngày hôm nay... (Click ra ngoài để tự động lưu)"
+                style={{
+                  flex: 1,
+                  minHeight: 220,
+                  background: "var(--bg-overlay)",
+                  border: "1px solid var(--border-default)",
+                  borderRadius: "var(--radius-md)",
+                  color: "var(--text-primary)",
+                  fontSize: "var(--text-sm)",
+                  padding: "var(--space-3)",
+                  resize: "vertical",
+                  outline: "none",
+                  fontFamily: "var(--font-sans)",
+                  lineHeight: 1.6,
+                  transition: "border-color 150ms ease",
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = "var(--accent-primary)")}
+                onBlur={e => {
+                  e.currentTarget.style.borderColor = "var(--border-default)";
+                  handleNoteBlur();
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  minHeight: 220,
+                  background: "var(--bg-overlay)",
+                  border: "1px solid var(--border-default)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "var(--space-3)",
+                  fontSize: "var(--text-sm)",
+                  color: "var(--text-primary)",
+                  overflowY: "auto"
+                }}
+              >
+                {noteContent ? (
+                  <ReactMarkdown>{noteContent}</ReactMarkdown>
+                ) : (
+                  <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Chưa có nội dung ghi chú.</span>
+                )}
+              </div>
+            )}
+            
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-2)" }}>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+                💡 Hỗ trợ Markdown
+              </span>
+              <span style={{ fontSize: "var(--text-xs)", color: saveStatus === "Đang lưu..." ? "var(--accent-primary)" : "var(--text-muted)", fontWeight: 500 }}>
+                {saveStatus}
+              </span>
+            </div>
+          </div>
+
         </div>
       </div>
 

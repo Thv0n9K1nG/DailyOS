@@ -1,4 +1,13 @@
-﻿namespace LifeBoard.API.Services.Interfaces;
+﻿using LifeBoard.API.Models.DTOs;
 
-// TODO: Define methods based on docs/09-API-Specification.md and docs/06-SRS.md
-public interface IHabitService { }
+namespace LifeBoard.API.Services.Interfaces;
+
+public interface IHabitService
+{
+    Task<IEnumerable<HabitDto>> GetAllActiveAsync();
+    Task<HabitDto> CreateAsync(CreateHabitDto dto);
+    Task<HabitDto> UpdateAsync(int id, UpdateHabitDto dto);
+    Task DeleteAsync(int id);
+    Task DeactivateAsync(int id);
+    Task UpsertCheckinAsync(int id, DateTime date, bool isCompleted);
+}

@@ -1,4 +1,11 @@
-﻿namespace LifeBoard.API.Services.Interfaces;
+﻿using LifeBoard.API.Models.DTOs;
 
-// TODO: Define methods based on docs/09-API-Specification.md and docs/06-SRS.md
-public interface IDailyNoteService { }
+namespace LifeBoard.API.Services.Interfaces;
+
+public interface IDailyNoteService
+{
+    Task<DailyNoteDto?> GetByDateAsync(DateTime date);
+    Task<IEnumerable<DailyNoteDto>> GetAllAsync();
+    Task<DailyNoteDto> UpsertAsync(UpsertDailyNoteDto dto);
+    Task DeleteAsync(int id);
+}

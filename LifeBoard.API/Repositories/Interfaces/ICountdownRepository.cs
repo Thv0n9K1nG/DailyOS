@@ -1,4 +1,12 @@
-﻿namespace LifeBoard.API.Repositories.Interfaces;
+﻿using LifeBoard.API.Models.Entities;
 
-// TODO: Define CRUD methods matching docs/07-ERD-Database-Design.md queries
-public interface ICountdownRepository { }
+namespace LifeBoard.API.Repositories.Interfaces;
+
+public interface ICountdownRepository
+{
+    Task<IEnumerable<CountdownEntity>> GetAllAsync();
+    Task<CountdownEntity?> GetByIdAsync(int id);
+    Task<CountdownEntity> CreateAsync(CountdownEntity countdown);
+    Task<CountdownEntity> UpdateAsync(CountdownEntity countdown);
+    Task DeleteAsync(int id);
+}

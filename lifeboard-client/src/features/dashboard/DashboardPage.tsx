@@ -4,6 +4,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useTasks, useCompleteTask, useUncompleteTask } from "../tasks/hooks/useTasks";
 import { Button } from "../../components/ui/Button";
 import { SkeletonList } from "../../components/ui/SkeletonCard";
+import { useCountdowns } from "../countdown/hooks/useCountdowns";
+import { daysRemainingLabel } from "@/lib/utils";
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   high:   { label: "Cao",  color: "var(--priority-high)",   bg: "rgba(248,113,113,0.12)" },
@@ -76,6 +78,7 @@ const MiniCalendar: React.FC = () => {
 export const DashboardPage: React.FC = () => {
   const today = new Date().toISOString().split("T")[0];
   const { data, isLoading } = useTasks({ plannedDate: today });
+  const { data: countdownsData } = useCountdowns();
   const completeTask = useCompleteTask();
   const uncompleteTask = useUncompleteTask();
 
@@ -337,6 +340,33 @@ export const DashboardPage: React.FC = () => {
             </h4>
             <MiniCalendar />
           </div>
+
+          {/* Countdowns widget */}
+          {countdownsData && countdownsData.length > 0 && (
+            <div style={{
+              background:"var(--bg-surface)",
+              borderRadius:"var(--radius-lg)",
+              border:"1px solid var(--border-subtle)",
+              padding:"var(--space-4)",
+            }}>
+              <h4 style={{ fontSize:"var(--text-sm)",fontWeight:600,color:"var(--text-secondary)",marginBottom:"var(--space-3)",margin:"0 0 var(--space-3)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span>Sự kiện đếm ngược</span>
+                <Link to="/countdown" style={{ fontSize:"var(--text-xs)", color:"var(--accent-primary)", textDecoration:"none", fontWeight: 600 }}>Xem tất cả</Link>
+              </h4>
+              <div style={{ display:"flex", flexDirection:"column", gap:"var(--space-2)" }}>
+                {countdownsData.slice(0, 3).map(c => {
+                  const diff = c.daysRemaining;
+                  const label = daysRemainingLabel(diff);
+                  return (
+                    <div key={c.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"var(--space-2) var(--space-3)", background:"var(--bg-overlay)", borderRadius:"var(--radius-md)", border:"1px solid var(--border-subtle)" }}>
+                      <span style={{ fontSize:"var(--text-sm)", fontWeight:500 }}>{c.icon || "⏳"} {c.title}</span>
+                      <span style={{ fontSize:11, fontWeight:600, color: diff <= 3 && diff >= 0 ? "var(--color-danger)" : "var(--text-secondary)" }}>{label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Quick links */}
           <div style={{

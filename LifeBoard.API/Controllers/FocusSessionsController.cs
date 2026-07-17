@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using LifeBoard.API.Models.DTOs;
 using LifeBoard.API.Services.Interfaces;
 
 namespace LifeBoard.API.Controllers;
@@ -7,6 +8,25 @@ namespace LifeBoard.API.Controllers;
 [Route("api/v1/focus-sessions")]
 public class FocusSessionsController(ILogger<FocusSessionsController> logger, IFocusSessionService service) : ControllerBase
 {
-    // TODO: Implement endpoints
-    // Reference: docs/09-API-Specification.md — section for /focus-sessions
+    private readonly IFocusSessionService _service = service;
+
+    [HttpGet]
+    public async Task<IActionResult> GetAll([FromQuery] DateTime from, [FromQuery] DateTime to, [FromQuery] string? type)
+    {
+        return Ok(await _service.GetAllAsync(from, to, type));
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateFocusSessionDto dto)
+    {
+        var session = await _service.CreateAsync(dto);
+        return Created("", session);
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        await _service.DeleteAsync(id);
+        return NoContent();
+    }
 }

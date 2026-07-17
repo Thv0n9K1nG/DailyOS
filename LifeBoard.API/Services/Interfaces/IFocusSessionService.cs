@@ -1,4 +1,10 @@
-﻿namespace LifeBoard.API.Services.Interfaces;
+﻿using LifeBoard.API.Models.DTOs;
 
-// TODO: Define methods based on docs/09-API-Specification.md and docs/06-SRS.md
-public interface IFocusSessionService { }
+namespace LifeBoard.API.Services.Interfaces;
+
+public interface IFocusSessionService
+{
+    Task<object> GetAllAsync(DateTime from, DateTime to, string? type);
+    Task<FocusSessionDto> CreateAsync(CreateFocusSessionDto dto);
+    Task DeleteAsync(int id);
+}
