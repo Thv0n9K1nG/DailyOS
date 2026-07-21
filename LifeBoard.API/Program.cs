@@ -1,4 +1,5 @@
-﻿using Serilog;
+using Serilog;
+using Dapper;
 using LifeBoard.API.Infrastructure;
 using LifeBoard.API.Middleware;
 using LifeBoard.API.Services;
@@ -8,6 +9,10 @@ using LifeBoard.API.Repositories.Interfaces;
 using LifeBoard.API.BackgroundServices;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+
+// ── Fix Dapper: map snake_case columns (target_date) → PascalCase props (TargetDate) ──
+DefaultTypeMap.MatchNamesWithUnderscores = true;
+
 
 // ── Serilog Setup ─────────────────────────────────────────────
 Log.Logger = new LoggerConfiguration()

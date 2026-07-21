@@ -21,6 +21,17 @@ public class CreateFocusSessionDto
     public string? Label { get; set; }
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
+    public string? SessionDate { get; set; }  // local date as yyyy-MM-dd from client
+    public string? Splits { get; set; }
+}
+
+public class UpdateFocusSessionDto
+{
+    public string SessionType { get; set; } = "stopwatch";
+    public string? Label { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public string? SessionDate { get; set; }  // local date as yyyy-MM-dd from client
     public string? Splits { get; set; }
 }
 

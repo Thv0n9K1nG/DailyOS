@@ -21,16 +21,6 @@ function formatTomorrow(date: Date) {
   return `${days[date.getDay()]}, ${date.getDate()} tháng ${date.getMonth() + 1} năm ${date.getFullYear()}`;
 }
 
-function formatDeadline(iso?: string) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  const now = new Date();
-  const diff = Math.ceil((d.getTime() - now.getTime()) / 86400000);
-  const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
-  const isOverdue = diff < 0;
-  return { text: isOverdue ? `Quá hạn ${Math.abs(diff)}d` : `${dateStr}`, overdue: isOverdue };
-}
-
 export const TomorrowPage: React.FC = () => {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -160,7 +150,6 @@ export const TomorrowPage: React.FC = () => {
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           {tasks.map((task, idx) => {
             const pri = PRIORITY_CONFIG[task.priority];
-            const deadline = formatDeadline(task.deadline);
             return (
               <div
                 key={task.id}
@@ -208,18 +197,6 @@ export const TomorrowPage: React.FC = () => {
 
                 {/* Badges + Actions */}
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexShrink: 0 }}>
-                  {deadline && (
-                    <span style={{
-                      display: "flex", alignItems: "center", gap: 3,
-                      padding: "2px 7px", borderRadius: "var(--radius-full)",
-                      fontSize: 10, fontWeight: 600,
-                      color: deadline.overdue ? "var(--color-danger)" : "var(--text-muted)",
-                      background: deadline.overdue ? "rgba(248,113,113,0.1)" : "var(--bg-overlay)",
-                    }}>
-                      {deadline.overdue ? <AlertTriangle size={9} /> : <CalendarDays size={9} />}
-                      {deadline.text}
-                    </span>
-                  )}
                   <span style={{ padding: "2px 8px", borderRadius: "var(--radius-full)", fontSize: 10, fontWeight: 600, color: pri.color, background: pri.bg }}>
                     {pri.label}
                   </span>

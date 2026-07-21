@@ -1,11 +1,13 @@
-import React, { useState } from "react";
-import { CheckCircle, Circle, ArrowRight, TrendingUp, ListTodo, CheckCheck, Clock } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { CheckCircle, Circle, ArrowRight, TrendingUp, ListTodo, CheckCheck, Clock, FileText } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTasks, useCompleteTask, useUncompleteTask } from "../tasks/hooks/useTasks";
 import { Button } from "../../components/ui/Button";
 import { SkeletonList } from "../../components/ui/SkeletonCard";
 import { useCountdowns } from "../countdown/hooks/useCountdowns";
-import { daysRemainingLabel } from "@/lib/utils";
+import { calcDaysRemaining, fmtDays } from "../countdown/CountdownPage";
+import { useDailyNote, useUpsertDailyNote } from "../notes/hooks/useNotes";
+import ReactMarkdown from "react-markdown";
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   high:   { label: "Cao",  color: "var(--priority-high)",   bg: "rgba(248,113,113,0.12)" },
@@ -81,6 +83,30 @@ export const DashboardPage: React.FC = () => {
   const { data: countdownsData } = useCountdowns();
   const completeTask = useCompleteTask();
   const uncompleteTask = useUncompleteTask();
+
+  // Daily Note editor state for today
+  const [noteContent, setNoteContent] = useState("");
+  const [noteTab, setNoteTab] = useState<'edit' | 'preview'>('edit');
+  const [saveStatus, setSaveStatus] = useState("Đã lưu");
+
+  const { data: dbNote, isLoading: isLoadingNote } = useDailyNote(today);
+  const upsertNote = useUpsertDailyNote();
+
+  useEffect(() => {
+    if (dbNote) {
+      setNoteContent(dbNote.content || "");
+    } else {
+      setNoteContent("");
+    }
+  }, [dbNote]);
+
+  const handleNoteBlur = () => {
+    setSaveStatus("Đang lưu...");
+    upsertNote.mutate({ noteDate: today, content: noteContent }, {
+      onSuccess: () => setSaveStatus("Đã lưu"),
+      onError: () => setSaveStatus("Lỗi lưu!")
+    });
+  };
 
   const tasks = data?.data || [];
   const done = tasks.filter(t => t.status === "done").length;
@@ -355,12 +381,12 @@ export const DashboardPage: React.FC = () => {
               </h4>
               <div style={{ display:"flex", flexDirection:"column", gap:"var(--space-2)" }}>
                 {countdownsData.slice(0, 3).map(c => {
-                  const diff = c.daysRemaining;
-                  const label = daysRemainingLabel(diff);
+                  const diff = calcDaysRemaining(c.targetDate);
+                  const label = fmtDays(diff);
                   return (
                     <div key={c.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"var(--space-2) var(--space-3)", background:"var(--bg-overlay)", borderRadius:"var(--radius-md)", border:"1px solid var(--border-subtle)" }}>
                       <span style={{ fontSize:"var(--text-sm)", fontWeight:500 }}>{c.icon || "⏳"} {c.title}</span>
-                      <span style={{ fontSize:11, fontWeight:600, color: diff <= 3 && diff >= 0 ? "var(--color-danger)" : "var(--text-secondary)" }}>{label}</span>
+                      <span style={{ fontSize:11, fontWeight:600, color: diff <= 7 && diff >= 0 ? "var(--color-danger)" : "var(--text-secondary)" }}>{label}</span>
                     </div>
                   );
                 })}
@@ -408,6 +434,110 @@ export const DashboardPage: React.FC = () => {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Daily note editor - full width bottom panel */}
+      <div style={{
+        background: "var(--bg-surface)",
+        borderRadius: "var(--radius-lg)",
+        border: "1px solid var(--border-subtle)",
+        padding: "var(--space-5)",
+        marginTop: "var(--space-5)",
+        display: "flex",
+        flexDirection: "column",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+          <h3 style={{
+            fontSize: "var(--text-md)",
+            fontWeight: 600,
+            color: "var(--text-primary)",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            margin: 0
+          }}>
+            <FileText size={18} style={{ color: "var(--color-warning)" }} />
+            Ghi chú hôm nay
+          </h3>
+          <div style={{ display: "flex", gap: "2px", background: "var(--bg-overlay)", borderRadius: "6px", padding: "2px" }}>
+            <button
+              onClick={() => setNoteTab('edit')}
+              style={{
+                border: "none", background: noteTab === 'edit' ? "var(--bg-surface)" : "none",
+                color: noteTab === 'edit' ? "var(--text-primary)" : "var(--text-muted)",
+                padding: "3px 8px", fontSize: "10px", fontWeight: 600, borderRadius: "4px", cursor: "pointer"
+              }}
+            >
+              Sửa
+            </button>
+            <button
+              onClick={() => setNoteTab('preview')}
+              style={{
+                border: "none", background: noteTab === 'preview' ? "var(--bg-surface)" : "none",
+                color: noteTab === 'preview' ? "var(--text-primary)" : "var(--text-muted)",
+                padding: "3px 8px", fontSize: "10px", fontWeight: 600, borderRadius: "4px", cursor: "pointer"
+              }}
+            >
+              Xem
+            </button>
+          </div>
+        </div>
+
+        {isLoadingNote ? (
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", padding: "10px 0" }}>Đang tải ghi chú...</div>
+        ) : noteTab === 'edit' ? (
+          <textarea
+            value={noteContent}
+            onChange={e => setNoteContent(e.target.value)}
+            placeholder="Viết ghi chú nhanh hôm nay... (Tự động lưu khi click ra ngoài)"
+            style={{
+              width: "100%",
+              minHeight: 140,
+              background: "var(--bg-overlay)",
+              border: "1px solid var(--border-default)",
+              borderRadius: "var(--radius-md)",
+              color: "var(--text-primary)",
+              fontSize: "var(--text-sm)",
+              padding: "var(--space-3)",
+              resize: "vertical",
+              outline: "none",
+              fontFamily: "var(--font-sans)",
+              lineHeight: 1.6,
+              transition: "border-color 150ms ease",
+            }}
+            onFocus={e => (e.currentTarget.style.borderColor = "var(--accent-primary)")}
+            onBlur={e => {
+              e.currentTarget.style.borderColor = "var(--border-default)";
+              handleNoteBlur();
+            }}
+          />
+        ) : (
+          <div style={{
+            minHeight: 140,
+            background: "var(--bg-overlay)",
+            border: "1px solid var(--border-default)",
+            borderRadius: "var(--radius-md)",
+            padding: "var(--space-3)",
+            fontSize: "var(--text-sm)",
+            color: "var(--text-primary)",
+            overflowY: "auto"
+          }}>
+            {noteContent ? (
+              <ReactMarkdown>{noteContent}</ReactMarkdown>
+            ) : (
+              <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>Chưa có ghi chú cho ngày hôm nay.</span>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-2)" }}>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+            💡 Hỗ trợ định dạng Markdown
+          </span>
+          <span style={{ fontSize: "var(--text-xs)", color: saveStatus === "Đang lưu..." ? "var(--accent-primary)" : "var(--text-muted)", fontWeight: 500 }}>
+            {saveStatus}
+          </span>
         </div>
       </div>
     </div>

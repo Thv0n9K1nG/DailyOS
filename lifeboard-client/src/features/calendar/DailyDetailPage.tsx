@@ -210,6 +210,8 @@ export const DailyDetailPage: React.FC = () => {
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
               {tasks.map(task => {
                 const pri = PRIORITY_CONFIG[task.priority];
+                const isDone = task.status === "done";
+                const isOverdue = !isDone && task.plannedDate && new Date(task.plannedDate.split('T')[0]).getTime() < new Date().setHours(0,0,0,0);
                 return (
                   <div
                     key={task.id}
@@ -219,9 +221,9 @@ export const DailyDetailPage: React.FC = () => {
                       gap: "var(--space-3)",
                       padding: "var(--space-3) var(--space-4)",
                       borderRadius: "var(--radius-md)",
-                      border: "1px solid var(--border-subtle)",
-                      borderLeft: `3px solid ${pri.color}`,
-                      background: task.status === "done" ? "var(--bg-base)" : "var(--bg-elevated)",
+                      border: isOverdue ? "1px solid rgba(239, 68, 68, 0.2)" : "1px solid var(--border-subtle)",
+                      borderLeft: isOverdue ? "3px solid var(--color-danger)" : `3px solid ${pri.color}`,
+                      background: isDone ? "var(--bg-base)" : isOverdue ? "rgba(239, 68, 68, 0.05)" : "var(--bg-elevated)",
                       transition: "all 150ms ease",
                       animation: "slideInLeft 200ms ease both",
                     }}
@@ -237,12 +239,14 @@ export const DailyDetailPage: React.FC = () => {
                         border: "none",
                         cursor: "pointer",
                         padding: 0,
-                        color: task.status === "done" ? "var(--color-success)" : "var(--text-muted)",
+                        color: task.status === "done" ? "var(--color-success)" : isOverdue ? "var(--color-danger)" : "var(--text-muted)",
                         flexShrink: 0,
                         display: "flex",
                         alignItems: "center",
                         transition: "color 150ms ease, transform 150ms ease",
                       }}
+                      onMouseEnter={e => !isDone && ((e.currentTarget as HTMLButtonElement).style.color = "var(--color-success)")}
+                      onMouseLeave={e => !isDone && ((e.currentTarget as HTMLButtonElement).style.color = isOverdue ? "var(--color-danger)" : "var(--text-muted)")}
                     >
                       {task.status === "done" ? <CheckCircle size={20} /> : <Circle size={20} />}
                     </button>
@@ -252,7 +256,7 @@ export const DailyDetailPage: React.FC = () => {
                         style={{
                           fontSize: "var(--text-base)",
                           fontWeight: 500,
-                          color: task.status === "done" ? "var(--text-muted)" : "var(--text-primary)",
+                          color: task.status === "done" ? "var(--text-muted)" : isOverdue ? "var(--color-danger)" : "var(--text-primary)",
                           textDecoration: task.status === "done" ? "line-through" : "none",
                         }}
                       >
@@ -265,19 +269,34 @@ export const DailyDetailPage: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Priority badge */}
-                    <span
-                      style={{
-                        padding: "2px 8px",
-                        borderRadius: "var(--radius-full)",
-                        fontSize: "var(--text-xs)",
-                        fontWeight: 600,
-                        color: pri.color,
-                        background: `${pri.color}22`,
-                      }}
-                    >
-                      {pri.label}
-                    </span>
+                    {/* Overdue / Priority Badge */}
+                    {isOverdue ? (
+                      <span
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: "var(--radius-full)",
+                          fontSize: "var(--text-xs)",
+                          fontWeight: 600,
+                          color: "var(--color-danger)",
+                          background: "rgba(239, 68, 68, 0.15)",
+                        }}
+                      >
+                        Chưa xong
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: "var(--radius-full)",
+                          fontSize: "var(--text-xs)",
+                          fontWeight: 600,
+                          color: pri.color,
+                          background: `${pri.color}22`,
+                        }}
+                      >
+                        {pri.label}
+                      </span>
+                    )}
                   </div>
                 );
               })}

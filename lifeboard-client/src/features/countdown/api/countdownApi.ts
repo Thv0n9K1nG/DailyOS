@@ -3,7 +3,7 @@ import api from '../../../lib/api';
 export interface Countdown {
   id: number;
   title: string;
-  targetDate: string;
+  targetDate: string; // always yyyy-MM-dd from backend
   daysRemaining: number;
   icon?: string;
   color?: string;

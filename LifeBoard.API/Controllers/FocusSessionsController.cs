@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using LifeBoard.API.Models.DTOs;
 using LifeBoard.API.Services.Interfaces;
 
@@ -21,6 +21,13 @@ public class FocusSessionsController(ILogger<FocusSessionsController> logger, IF
     {
         var session = await _service.CreateAsync(dto);
         return Created("", session);
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateFocusSessionDto dto)
+    {
+        var session = await _service.UpdateAsync(id, dto);
+        return Ok(session);
     }
 
     [HttpDelete("{id}")]

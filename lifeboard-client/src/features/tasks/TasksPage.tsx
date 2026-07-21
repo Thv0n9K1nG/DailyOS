@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Plus, CheckCircle, Circle, Trash2, Edit2, CheckSquare, Tag,
   CalendarDays, AlertTriangle,
@@ -42,8 +42,15 @@ interface TaskCardProps {
 const TaskCard: React.FC<TaskCardProps> = ({ task, index, onEdit, onDelete, onToggle }) => {
   const [showActions, setShowActions] = useState(false);
   const pri = PRIORITY_CONFIG[task.priority];
-  const deadline = formatDeadline(task.deadline);
   const isDone = task.status === "done";
+
+  // Task is overdue if not completed and planned date is in the past compared to today
+  const isOverdue = useMemo(() => {
+    if (isDone || !task.plannedDate) return false;
+    const planned = new Date(task.plannedDate.split('T')[0]).getTime();
+    const today = new Date().setHours(0,0,0,0);
+    return planned < today;
+  }, [task.plannedDate, isDone]);
 
   return (
     <div
@@ -52,10 +59,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onEdit, onDelete, onTo
         alignItems: "center",
         gap: "var(--space-3)",
         padding: "var(--space-4)",
-        background: isDone ? "var(--bg-base)" : "var(--bg-surface)",
+        background: isDone ? "var(--bg-base)" : isOverdue ? "rgba(239, 68, 68, 0.05)" : "var(--bg-surface)",
         borderRadius: "var(--radius-md)",
-        border: "1px solid var(--border-subtle)",
-        borderLeft: `3px solid ${pri.color}`,
+        border: isOverdue ? "1px solid rgba(239, 68, 68, 0.2)" : "1px solid var(--border-subtle)",
+        borderLeft: isOverdue ? "3px solid var(--color-danger)" : `3px solid ${pri.color}`,
         transition: "all 150ms ease",
         animation: `slideInLeft 200ms ${index * 40}ms ease both`,
         position: "relative",
@@ -70,12 +77,12 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onEdit, onDelete, onTo
         aria-label={isDone ? "Đánh dấu chưa xong" : "Hoàn thành"}
         style={{
           background: "none", border: "none", cursor: "pointer", padding: 0,
-          color: isDone ? "var(--color-success)" : "var(--text-muted)",
+          color: isDone ? "var(--color-success)" : isOverdue ? "var(--color-danger)" : "var(--text-muted)",
           flexShrink: 0, display: "flex", alignItems: "center",
           transition: "color 150ms ease, transform 150ms ease",
         }}
         onMouseEnter={e => !isDone && ((e.currentTarget as HTMLButtonElement).style.color = "var(--color-success)")}
-        onMouseLeave={e => !isDone && ((e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)")}
+        onMouseLeave={e => !isDone && ((e.currentTarget as HTMLButtonElement).style.color = isOverdue ? "var(--color-danger)" : "var(--text-muted)")}
       >
         {isDone ? <CheckCircle size={20} /> : <Circle size={20} />}
       </button>
@@ -86,7 +93,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onEdit, onDelete, onTo
           style={{
             fontSize: "var(--text-base)",
             fontWeight: 500,
-            color: isDone ? "var(--text-muted)" : "var(--text-primary)",
+            color: isDone ? "var(--text-muted)" : isOverdue ? "var(--color-danger)" : "var(--text-primary)",
             textDecoration: isDone ? "line-through" : "none",
             whiteSpace: "nowrap",
             overflow: "hidden",
@@ -126,17 +133,17 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onEdit, onDelete, onTo
 
       {/* Metadata + actions */}
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexShrink: 0 }}>
-        {/* Deadline */}
-        {deadline && (
+        {/* Overdue Badge */}
+        {isOverdue && (
           <span style={{
             display: "flex", alignItems: "center", gap: 3,
             padding: "2px 7px", borderRadius: "var(--radius-full)",
             fontSize: 10, fontWeight: 600,
-            color: deadline.overdue ? "var(--color-danger)" : "var(--text-muted)",
-            background: deadline.overdue ? "rgba(248,113,113,0.1)" : "var(--bg-overlay)",
+            color: "var(--color-danger)",
+            background: "rgba(239,68,68,0.1)",
           }}>
-            {deadline.overdue ? <AlertTriangle size={9} /> : <CalendarDays size={9} />}
-            {deadline.text}
+            <AlertTriangle size={9} />
+            Quá hạn
           </span>
         )}
 

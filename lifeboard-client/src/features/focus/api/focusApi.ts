@@ -22,6 +22,7 @@ export type CreateFocusSessionPayload = {
   label?: string;
   startTime: string;
   endTime: string;
+  sessionDate?: string;  // local date yyyy-MM-dd
   splits?: string;
 };
 
@@ -32,6 +33,10 @@ export const focusApi = {
   },
   create: async (data: CreateFocusSessionPayload): Promise<FocusSession> => {
     const res = await api.post<FocusSession>('/focus-sessions', data);
+    return res.data;
+  },
+  update: async (id: number, data: CreateFocusSessionPayload): Promise<FocusSession> => {
+    const res = await api.put<FocusSession>(`/focus-sessions/${id}`, data);
     return res.data;
   }
 };

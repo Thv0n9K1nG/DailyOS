@@ -13,7 +13,8 @@ public class CountdownService(ICountdownRepository repository) : ICountdownServi
     {
         Id = e.Id,
         Title = e.Title,
-        TargetDate = e.TargetDate,
+        // Return as plain yyyy-MM-dd string — avoids UTC offset issues on client
+        TargetDate = e.TargetDate.ToString("yyyy-MM-dd"),
         DaysRemaining = (e.TargetDate.Date - DateTime.Today).Days,
         Icon = e.Icon,
         Color = e.Color,
@@ -29,7 +30,9 @@ public class CountdownService(ICountdownRepository repository) : ICountdownServi
 
     public async Task<CountdownDto> CreateAsync(CreateCountdownDto dto)
     {
-        var entity = new CountdownEntity { Title = dto.Title, TargetDate = dto.TargetDate.Date, Icon = dto.Icon, Color = dto.Color };
+        var targetDate = DateTime.ParseExact(dto.TargetDate, "yyyy-MM-dd",
+            System.Globalization.CultureInfo.InvariantCulture);
+        var entity = new CountdownEntity { Title = dto.Title, TargetDate = targetDate, Icon = dto.Icon, Color = dto.Color };
         var created = await _repository.CreateAsync(entity);
         return MapToDto(created);
     }
@@ -37,8 +40,10 @@ public class CountdownService(ICountdownRepository repository) : ICountdownServi
     public async Task<CountdownDto> UpdateAsync(int id, UpdateCountdownDto dto)
     {
         var existing = await _repository.GetByIdAsync(id) ?? throw new KeyNotFoundException("Countdown not found");
+        var targetDate = DateTime.ParseExact(dto.TargetDate, "yyyy-MM-dd",
+            System.Globalization.CultureInfo.InvariantCulture);
         existing.Title = dto.Title;
-        existing.TargetDate = dto.TargetDate.Date;
+        existing.TargetDate = targetDate;
         existing.Icon = dto.Icon;
         existing.Color = dto.Color;
         var updated = await _repository.UpdateAsync(existing);

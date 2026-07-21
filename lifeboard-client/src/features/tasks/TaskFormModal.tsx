@@ -11,7 +11,6 @@ const taskSchema = z.object({
   title: z.string().min(1, "Tên nhiệm vụ không được để trống").max(255),
   description: z.string().optional(),
   priority: z.enum(["low", "medium", "high"]),
-  deadline: z.string().optional(),
   plannedDate: z.string().optional(),
 });
 
@@ -46,7 +45,6 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       title: "",
       description: "",
       priority: "medium",
-      deadline: "",
       plannedDate: new Date().toISOString().split("T")[0],
     },
   });
@@ -57,7 +55,6 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
         title: initialData.title,
         description: initialData.description || "",
         priority: initialData.priority,
-        deadline: initialData.deadline?.split("T")[0] || "",
         plannedDate: initialData.plannedDate?.split("T")[0] || "",
       });
     } else {
@@ -65,7 +62,6 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
         title: "",
         description: "",
         priority: "medium",
-        deadline: "",
         plannedDate: new Date().toISOString().split("T")[0],
       });
     }
@@ -77,7 +73,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       isRecurring: false,
       tagIds: [],
       plannedDate: data.plannedDate ? new Date(data.plannedDate).toISOString() : undefined,
-      deadline: data.deadline ? new Date(data.deadline).toISOString() : undefined,
+      deadline: undefined,
     });
   };
 
@@ -182,19 +178,11 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           </div>
 
           {/* Date row */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
-            <div>
-              <label style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: "var(--space-1)" }}>
-                Ngày dự kiến
-              </label>
-              <Input type="date" {...register("plannedDate")} />
-            </div>
-            <div>
-              <label style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: "var(--space-1)" }}>
-                Hạn chót
-              </label>
-              <Input type="date" {...register("deadline")} />
-            </div>
+          <div>
+            <label style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--text-secondary)", display: "block", marginBottom: "var(--space-1)" }}>
+              Ngày dự kiến
+            </label>
+            <Input type="date" {...register("plannedDate")} />
           </div>
 
           {/* Actions */}

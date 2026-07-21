@@ -18,6 +18,12 @@ public class FocusSessionRepository(DbConnectionFactory db) : IFocusSessionRepos
         );
     }
 
+    public async Task<FocusSessionEntity?> GetByIdAsync(int id)
+    {
+        using var conn = _db.CreateConnection();
+        return await conn.QuerySingleOrDefaultAsync<FocusSessionEntity>("SELECT * FROM focus_sessions WHERE id = @Id", new { Id = id });
+    }
+
     public async Task<FocusSessionEntity> CreateAsync(FocusSessionEntity session)
     {
         using var conn = _db.CreateConnection();
@@ -27,6 +33,19 @@ public class FocusSessionRepository(DbConnectionFactory db) : IFocusSessionRepos
             SELECT LAST_INSERT_ID();";
         var id = await conn.ExecuteScalarAsync<int>(sql, session);
         return await conn.QuerySingleOrDefaultAsync<FocusSessionEntity>("SELECT * FROM focus_sessions WHERE id = @Id", new { Id = id });
+    }
+
+    public async Task<FocusSessionEntity> UpdateAsync(FocusSessionEntity session)
+    {
+        using var conn = _db.CreateConnection();
+        var sql = @"
+            UPDATE focus_sessions 
+            SET session_type = @SessionType, label = @Label, start_time = @StartTime, 
+                end_time = @EndTime, duration_seconds = @DurationSeconds, 
+                session_date = @SessionDate, splits = @Splits
+            WHERE id = @Id;";
+        await conn.ExecuteAsync(sql, session);
+        return session;
     }
 
     public async Task DeleteAsync(int id)
