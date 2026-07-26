@@ -1,8 +1,10 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import {
-  Plus, CheckCircle, Circle, Trash2, Edit2, CheckSquare, Tag,
-  CalendarDays, AlertTriangle,
+  Plus, CheckCircle2, Circle, Trash2, Edit2, ChevronLeft, ChevronRight,
+  Calendar, AlertCircle, Flame, AlignLeft, CheckSquare2,
+  ListChecks, Clock4, FilterX,
 } from "lucide-react";
+
 import {
   useTasks, useCreateTask, useUpdateTask,
   useDeleteTask, useCompleteTask, useUncompleteTask,
@@ -10,335 +12,801 @@ import {
 import { Task } from "./api/taskApi";
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
-import { SkeletonList } from "../../components/ui/SkeletonCard";
 import { TaskFormModal } from "./TaskFormModal";
+import { getTodayInTz, getStoredTimezone } from "../../stores/timezoneStore";
 
-type FilterStatus = "" | "pending" | "done";
+/* ── Helpers ──────────────────────────────────────────────────────────────── */
+/**
+ * Format a Date object to YYYY-MM-DD using the user's stored timezone.
+ * Always uses Intl to be timezone-aware (not JS local methods which follow OS).
+ */
+function toDateStr(d: Date): string {
+  const tz = getStoredTimezone();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(d);
+  const y = parts.find(p => p.type === "year")?.value ?? "";
+  const m = parts.find(p => p.type === "month")?.value ?? "";
+  const dy = parts.find(p => p.type === "day")?.value ?? "";
+  return `${y}-${m}-${dy}`;
+}
 
-const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  high:   { label: "Cao",  color: "var(--priority-high)",   bg: "rgba(248,113,113,0.12)" },
-  medium: { label: "Vừa", color: "var(--priority-medium)", bg: "rgba(255,179,71,0.12)" },
-  low:    { label: "Thấp", color: "var(--priority-low)",   bg: "rgba(82,215,191,0.12)" },
+/** Today's date string YYYY-MM-DD in user timezone */
+function todayStr() { return getTodayInTz(); }
+
+function parsePlannedDate(raw?: string): Date | null {
+  if (!raw) return null;
+  // raw is always YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss — strip time part
+  const s = raw.split("T")[0];
+  const [y, mo, d] = s.split("-").map(Number);
+  // Build a midnight Date in user timezone via Intl offset trick
+  // We interpret the date string as a local date (no UTC shift needed)
+  const dt = new Date(y, mo - 1, d, 0, 0, 0, 0);
+  return dt;
+}
+
+/**
+ * Format date label for the navigator header.
+ * FIXED: compare date *strings* (YYYY-MM-DD) instead of raw timestamps
+ * to avoid Math.round(0.64) = 1 → 'Ngày mai' bug when time-of-day > noon.
+ */
+function fmtDateLabel(d: Date): string {
+  const dStr = toDateStr(d);
+  const tStr = todayStr();
+
+  // Build yesterday / tomorrow strings
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+  const tomorrow  = new Date(); tomorrow.setDate(tomorrow.getDate()  + 1);
+
+  const tz  = getStoredTimezone();
+  // Get display parts in user timezone
+  const parts = new Intl.DateTimeFormat("vi-VN", {
+    timeZone: tz, weekday: "short", day: "2-digit", month: "2-digit",
+  }).formatToParts(d);
+  const weekday = parts.find(p => p.type === "weekday")?.value ?? "";
+  const dayNum  = parts.find(p => p.type === "day")?.value ?? "";
+  const monNum  = parts.find(p => p.type === "month")?.value ?? "";
+  const ddmm = `${dayNum}/${monNum}`;
+
+  if (dStr === tStr)            return `Hôm nay — ${ddmm}`;
+  if (dStr === toDateStr(yesterday)) return `Hôm qua — ${ddmm}`;
+  if (dStr === toDateStr(tomorrow))  return `Ngày mai — ${ddmm}`;
+  return `${weekday}, ${ddmm}`;
+}
+
+/** Format a UTC datetime string (from API) to HH:mm in the user's timezone */
+function fmtCompletedAt(isoStr: string): string {
+  const tz = getStoredTimezone();
+  // Ensure the string is parsed as UTC: append Z if no timezone indicator present
+  const normalized = /[Zz]|[+-]\d{2}:?\d{2}$/.test(isoStr) ? isoStr : isoStr + "Z";
+  return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: tz,
+    hour: "2-digit", minute: "2-digit",
+    hour12: false,
+  }).format(new Date(normalized));
+}
+
+const PRIORITY = {
+  high:   { label: "Cao",  color: "var(--priority-high)",   bg: "rgba(248,113,113,0.12)", glow: "rgba(248,113,113,0.25)", icon: <Flame size={10} /> },
+  medium: { label: "Vừa", color: "var(--priority-medium)", bg: "rgba(255,179,71,0.12)",  glow: "rgba(255,179,71,0.25)",  icon: null },
+  low:    { label: "Thấp", color: "var(--priority-low)",   bg: "rgba(82,215,191,0.12)",  glow: "rgba(82,215,191,0.25)",  icon: null },
 };
 
-function formatDeadline(iso?: string) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  const now = new Date();
-  const diff = Math.ceil((d.getTime() - now.getTime()) / 86400000);
-  const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
-  const isOverdue = diff < 0;
-  return { text: isOverdue ? `Quá hạn ${Math.abs(diff)}d` : `${dateStr}`, overdue: isOverdue };
+/* ── Inline CSS for animations ────────────────────────────────────────────── */
+const styleTag = `
+@keyframes taskSlideIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
-
-interface TaskCardProps {
-  task: Task;
-  index: number;
-  onEdit: (t: Task) => void;
-  onDelete: (id: number) => void;
-  onToggle: (t: Task) => void;
+@keyframes checkBounce {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.35); }
+  70%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
 }
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+@keyframes ringFill {
+  from { stroke-dashoffset: 138.2; }
+}
+.task-card-enter { animation: taskSlideIn 220ms ease both; }
+.check-bounce    { animation: checkBounce 320ms cubic-bezier(0.34,1.56,0.64,1); }
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--bg-surface) 25%, var(--bg-elevated) 50%, var(--bg-surface) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.5s infinite;
+}
+`;
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, index, onEdit, onDelete, onToggle }) => {
-  const [showActions, setShowActions] = useState(false);
-  const pri = PRIORITY_CONFIG[task.priority];
-  const isDone = task.status === "done";
-
-  // Task is overdue if not completed and planned date is in the past compared to today
-  const isOverdue = useMemo(() => {
-    if (isDone || !task.plannedDate) return false;
-    const planned = new Date(task.plannedDate.split('T')[0]).getTime();
-    const today = new Date().setHours(0,0,0,0);
-    return planned < today;
-  }, [task.plannedDate, isDone]);
+/* ── Progress Ring ────────────────────────────────────────────────────────── */
+const ProgressRing = ({ done, total }: { done: number; total: number }) => {
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+  const r = 22; const circ = 2 * Math.PI * r;
+  const offset = circ - (pct / 100) * circ;
+  const isComplete = pct === 100;
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "var(--space-3)",
-        padding: "var(--space-4)",
-        background: isDone ? "var(--bg-base)" : isOverdue ? "rgba(239, 68, 68, 0.05)" : "var(--bg-surface)",
-        borderRadius: "var(--radius-md)",
-        border: isOverdue ? "1px solid rgba(239, 68, 68, 0.2)" : "1px solid var(--border-subtle)",
-        borderLeft: isOverdue ? "3px solid var(--color-danger)" : `3px solid ${pri.color}`,
-        transition: "all 150ms ease",
-        animation: `slideInLeft 200ms ${index * 40}ms ease both`,
-        position: "relative",
-        cursor: "default",
-      }}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
-    >
-      {/* Checkbox */}
-      <button
-        onClick={() => onToggle(task)}
-        aria-label={isDone ? "Đánh dấu chưa xong" : "Hoàn thành"}
-        style={{
-          background: "none", border: "none", cursor: "pointer", padding: 0,
-          color: isDone ? "var(--color-success)" : isOverdue ? "var(--color-danger)" : "var(--text-muted)",
-          flexShrink: 0, display: "flex", alignItems: "center",
-          transition: "color 150ms ease, transform 150ms ease",
-        }}
-        onMouseEnter={e => !isDone && ((e.currentTarget as HTMLButtonElement).style.color = "var(--color-success)")}
-        onMouseLeave={e => !isDone && ((e.currentTarget as HTMLButtonElement).style.color = isOverdue ? "var(--color-danger)" : "var(--text-muted)")}
-      >
-        {isDone ? <CheckCircle size={20} /> : <Circle size={20} />}
-      </button>
-
-      {/* Content */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: "var(--text-base)",
-            fontWeight: 500,
-            color: isDone ? "var(--text-muted)" : isOverdue ? "var(--color-danger)" : "var(--text-primary)",
-            textDecoration: isDone ? "line-through" : "none",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {task.title}
-        </div>
-        {task.description && !isDone && (
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ position: "relative", flexShrink: 0 }}>
+        <svg width={56} height={56} viewBox="0 0 52 52">
+          {/* Track */}
+          <circle cx={26} cy={26} r={r} fill="none"
+            stroke="var(--border-subtle)" strokeWidth={4} />
+          {/* Fill */}
+          <circle cx={26} cy={26} r={r} fill="none"
+            stroke={isComplete ? "var(--color-success)" : "var(--accent-primary)"}
+            strokeWidth={4}
+            strokeDasharray={circ}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            transform="rotate(-90 26 26)"
+            style={{
+              transition: "stroke-dashoffset 0.6s cubic-bezier(0.34,1.56,0.64,1), stroke 0.3s ease",
+              filter: pct > 0 ? `drop-shadow(0 0 4px ${isComplete ? "var(--color-success)" : "var(--accent-primary)"})` : "none",
+            }}
+          />
+          <text x={26} y={30} textAnchor="middle" fontSize={11} fontWeight={800}
+            fill={isComplete ? "var(--color-success)" : "var(--text-primary)"}>
+            {pct}%
+          </text>
+        </svg>
+        {isComplete && (
           <div style={{
-            fontSize: "var(--text-xs)", color: "var(--text-secondary)",
-            marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-          }}>
-            {task.description}
-          </div>
-        )}
-
-        {/* Tags row */}
-        {task.tags && task.tags.length > 0 && (
-          <div style={{ display: "flex", gap: "var(--space-1)", marginTop: "var(--space-1)", flexWrap: "wrap" }}>
-            {task.tags.map(tag => (
-              <span
-                key={tag.id}
-                style={{
-                  padding: "1px 6px", borderRadius: "var(--radius-full)",
-                  fontSize: 10, background: "var(--bg-overlay)", color: "var(--text-secondary)",
-                  display: "flex", alignItems: "center", gap: 3,
-                }}
-              >
-                <Tag size={8} />
-                {tag.name}
-              </span>
-            ))}
-          </div>
+            position: "absolute", top: -4, right: -4,
+            width: 16, height: 16, borderRadius: "50%",
+            background: "var(--color-success)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 9, border: "2px solid var(--bg-base)",
+          }}>✓</div>
         )}
       </div>
-
-      {/* Metadata + actions */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexShrink: 0 }}>
-        {/* Overdue Badge */}
-        {isOverdue && (
-          <span style={{
-            display: "flex", alignItems: "center", gap: 3,
-            padding: "2px 7px", borderRadius: "var(--radius-full)",
-            fontSize: 10, fontWeight: 600,
-            color: "var(--color-danger)",
-            background: "rgba(239,68,68,0.1)",
-          }}>
-            <AlertTriangle size={9} />
-            Quá hạn
-          </span>
-        )}
-
-        {/* Priority badge */}
-        <span style={{
-          padding: "2px 8px", borderRadius: "var(--radius-full)",
-          fontSize: 10, fontWeight: 600,
-          color: pri.color, background: pri.bg,
-        }}>
-          {pri.label}
-        </span>
-
-        {/* Hover actions */}
-        <div style={{
-          display: "flex", gap: "var(--space-1)",
-          opacity: showActions ? 1 : 0,
-          transition: "opacity 150ms ease",
-        }}>
-          <button
-            onClick={() => onEdit(task)}
-            style={{
-              padding: "var(--space-1) var(--space-2)",
-              borderRadius: "var(--radius-sm)",
-              background: "var(--bg-elevated)",
-              border: "1px solid var(--border-subtle)",
-              color: "var(--text-secondary)",
-              cursor: "pointer",
-              display: "flex", alignItems: "center",
-              transition: "all 150ms ease",
-            }}
-          >
-            <Edit2 size={13} />
-          </button>
-          <button
-            onClick={() => onDelete(task.id)}
-            style={{
-              padding: "var(--space-1) var(--space-2)",
-              borderRadius: "var(--radius-sm)",
-              background: "rgba(248,113,113,0.08)",
-              border: "1px solid rgba(248,113,113,0.2)",
-              color: "var(--color-danger)",
-              cursor: "pointer",
-              display: "flex", alignItems: "center",
-              transition: "all 150ms ease",
-            }}
-          >
-            <Trash2 size={13} />
-          </button>
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.3 }}>
+          {done}/{total} nhiệm vụ
+        </div>
+        <div style={{ fontSize: 11, color: isComplete ? "var(--color-success)" : "var(--text-muted)", marginTop: 2, fontWeight: isComplete ? 600 : 400 }}>
+          {total === 0 ? "Chưa có việc gì" : isComplete ? "🎉 Hoàn thành tất cả!" : `Còn ${total - done} việc nữa`}
         </div>
       </div>
     </div>
   );
 };
 
+/* ── Quick Add ────────────────────────────────────────────────────────────── */
+const QuickAdd = ({ onAdd }: { onAdd: (title: string) => void }) => {
+  const [val, setVal] = useState("");
+  const [focused, setFocused] = useState(false);
+
+  const submit = () => {
+    if (val.trim()) { onAdd(val.trim()); setVal(""); }
+  };
+
+  return (
+    <div style={{
+      display: "flex", gap: 8, alignItems: "center",
+      padding: "10px 14px",
+      background: focused ? "var(--bg-elevated)" : "var(--bg-surface)",
+      border: `1.5px solid ${focused ? "var(--accent-primary)" : "var(--border-subtle)"}`,
+      borderRadius: "var(--radius-lg)",
+      boxShadow: focused ? "0 0 0 3px var(--accent-glow)" : "none",
+      transition: "all 180ms ease",
+    }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: "var(--radius-md)",
+        background: focused ? "var(--accent-subtle)" : "var(--bg-overlay)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        flexShrink: 0, transition: "all 180ms ease",
+      }}>
+        <Plus size={15} color={focused ? "var(--accent-primary)" : "var(--text-muted)"} />
+      </div>
+      <input
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={e => e.key === "Enter" && submit()}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        placeholder="Thêm nhanh nhiệm vụ… nhấn Enter để lưu"
+        style={{
+          flex: 1, background: "none", border: "none", outline: "none",
+          color: "var(--text-primary)", fontSize: 14,
+          fontFamily: "var(--font-sans)",
+        }}
+      />
+      {val.trim() && (
+        <button
+          onClick={submit}
+          style={{
+            padding: "4px 12px", borderRadius: "var(--radius-md)",
+            background: "var(--accent-primary)", border: "none",
+            color: "#fff", fontSize: 12, fontWeight: 600,
+            cursor: "pointer", transition: "all 150ms ease",
+            animation: "taskSlideIn 150ms ease both",
+          }}
+        >
+          Thêm
+        </button>
+      )}
+    </div>
+  );
+};
+
+/* ── Skeleton card ────────────────────────────────────────────────────────── */
+const SkeletonTaskCard = ({ delay = 0 }: { delay?: number }) => (
+  <div style={{
+    height: 72, borderRadius: "var(--radius-md)",
+    border: "1px solid var(--border-subtle)",
+    overflow: "hidden", animationDelay: `${delay}ms`,
+  }} className="skeleton-shimmer" />
+);
+
+/* ── Task Card ────────────────────────────────────────────────────────────── */
+const TaskCard: React.FC<{
+  task: Task; isOverdue: boolean; index: number;
+  onEdit: () => void; onDelete: () => void; onToggle: () => void;
+}> = ({ task, isOverdue, index, onEdit, onDelete, onToggle }) => {
+  const [hover, setHover] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const isDone = task.status === "done";
+  const pri = PRIORITY[task.priority as keyof typeof PRIORITY] ?? PRIORITY.medium;
+
+  const handleToggle = () => {
+    setChecking(true);
+    setTimeout(() => setChecking(false), 400);
+    onToggle();
+  };
+
+  const borderColor = isDone
+    ? "var(--border-subtle)"
+    : isOverdue
+    ? "var(--color-danger)"
+    : pri.color;
+
+  return (
+    <div
+      className="task-card-enter"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: 12,
+        padding: "13px 16px",
+        background: isDone
+          ? "transparent"
+          : hover
+          ? "var(--bg-elevated)"
+          : "var(--bg-surface)",
+        borderRadius: "var(--radius-md)",
+        border: `1px solid ${hover && !isDone ? "var(--border-default)" : "var(--border-subtle)"}`,
+        borderLeft: `3px solid ${borderColor}`,
+        transition: "all 160ms ease",
+        boxShadow: hover && !isDone ? `0 4px 16px rgba(0,0,0,0.18), inset 0 0 0 0 transparent` : "none",
+        opacity: isDone ? 0.55 : 1,
+        animationDelay: `${index * 45}ms`,
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* Hover shimmer line */}
+      {hover && !isDone && (
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: 1,
+          background: `linear-gradient(90deg, transparent, ${pri.color}66, transparent)`,
+        }} />
+      )}
+
+      {/* Toggle checkbox */}
+      <button
+        onClick={handleToggle}
+        className={checking ? "check-bounce" : ""}
+        style={{
+          background: "none", border: "none", cursor: "pointer",
+          padding: 2, flexShrink: 0,
+          color: isDone ? "var(--color-success)" : isOverdue ? "var(--color-danger)" : "var(--text-muted)",
+          transition: "color 150ms, transform 150ms",
+          display: "flex", alignItems: "center",
+        }}
+        onMouseEnter={e => { if (!isDone) (e.currentTarget as HTMLButtonElement).style.color = "var(--color-success)"; }}
+        onMouseLeave={e => { if (!isDone) (e.currentTarget as HTMLButtonElement).style.color = isOverdue ? "var(--color-danger)" : "var(--text-muted)"; }}
+      >
+        {isDone
+          ? <CheckCircle2 size={20} />
+          : <Circle size={20} />
+        }
+      </button>
+
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 14, fontWeight: 500,
+          color: isDone ? "var(--text-muted)" : isOverdue ? "var(--color-danger)" : "var(--text-primary)",
+          textDecoration: isDone ? "line-through" : "none",
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          letterSpacing: "0.01em",
+        }}>
+          {task.title}
+        </div>
+
+        {task.description && !isDone && (
+          <div style={{
+            fontSize: 12, color: "var(--text-secondary)", marginTop: 3,
+            display: "flex", alignItems: "center", gap: 4,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            <AlignLeft size={10} style={{ flexShrink: 0 }} />
+            {task.description}
+          </div>
+        )}
+
+        {/* Badges */}
+        <div style={{ display: "flex", gap: 5, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 3,
+            padding: "2px 8px",
+            borderRadius: "var(--radius-full)",
+            fontSize: 10, fontWeight: 600,
+            color: isDone ? "var(--text-muted)" : pri.color,
+            background: isDone ? "var(--bg-overlay)" : pri.bg,
+            border: `1px solid ${isDone ? "transparent" : pri.color}30`,
+          }}>
+            {pri.icon}{pri.label}
+          </span>
+
+          {isOverdue && !isDone && (
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: 3,
+              padding: "2px 8px",
+              borderRadius: "var(--radius-full)",
+              fontSize: 10, fontWeight: 600,
+              color: "var(--color-danger)",
+              background: "rgba(248,113,113,0.1)",
+              border: "1px solid rgba(248,113,113,0.25)",
+            }}>
+              <AlertCircle size={9} />Quá hạn
+            </span>
+          )}
+
+          {isDone && task.completedAt && (
+            <span style={{
+              fontSize: 10, color: "var(--color-success)",
+              display: "flex", alignItems: "center", gap: 3,
+            }}>
+              ✓ {fmtCompletedAt(task.completedAt)}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div style={{
+        display: "flex", gap: 4, flexShrink: 0,
+        opacity: hover ? 1 : 0,
+        transform: hover ? "translateX(0)" : "translateX(6px)",
+        transition: "opacity 150ms, transform 150ms",
+      }}>
+        <button
+          onClick={onEdit}
+          title="Chỉnh sửa"
+          style={{
+            width: 28, height: 28, borderRadius: "var(--radius-sm)",
+            background: "var(--bg-overlay)",
+            border: "1px solid var(--border-default)",
+            color: "var(--text-secondary)", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 150ms",
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.background = "var(--accent-subtle)";
+            (e.currentTarget as HTMLButtonElement).style.color = "var(--accent-primary)";
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-overlay)";
+            (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
+          }}
+        >
+          <Edit2 size={12} />
+        </button>
+        <button
+          onClick={onDelete}
+          title="Xóa"
+          style={{
+            width: 28, height: 28, borderRadius: "var(--radius-sm)",
+            background: "rgba(248,113,113,0.07)",
+            border: "1px solid rgba(248,113,113,0.2)",
+            color: "var(--color-danger)", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 150ms",
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.background = "rgba(248,113,113,0.18)";
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.background = "rgba(248,113,113,0.07)";
+          }}
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ── Main Page ────────────────────────────────────────────────────────────── */
 export const TasksPage: React.FC = () => {
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>("");
-  const { data, isLoading } = useTasks(filterStatus ? { status: filterStatus } : {});
-  const createTask = useCreateTask();
-  const updateTask = useUpdateTask();
-  const deleteTask = useDeleteTask();
-  const completeTask = useCompleteTask();
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [filterStatus, setFilterStatus] = useState<"" | "pending" | "done">("");
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const dateStr = toDateStr(selectedDate);
+  const isToday = dateStr === todayStr();
+  const isPast = dateStr < todayStr();
+
+  const { data, isLoading, error } = useTasks({
+    plannedDate: dateStr,
+    ...(filterStatus ? { status: filterStatus } : {}),
+  });
+  const createTask  = useCreateTask();
+  const updateTask  = useUpdateTask();
+  const deleteTask  = useDeleteTask();
+  const completeTask   = useCompleteTask();
   const uncompleteTask = useUncompleteTask();
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const tasks: Task[] = data?.data ?? [];
 
-  const allTasks = data?.data || [];
-  // Calculate counts for each filter (using all tasks)
-  const { data: allData } = useTasks({});
-  const allItems = allData?.data || [];
-  const pendingCount = allItems.filter(t => t.status !== "done").length;
-  const doneCount = allItems.filter(t => t.status === "done").length;
+  const { data: allDayData } = useTasks({ plannedDate: dateStr });
+  const allDayTasks = allDayData?.data ?? [];
+  const doneCount  = allDayTasks.filter(t => t.status === "done").length;
+  const totalCount = allDayTasks.length;
+  const pendingCount = totalCount - doneCount;
+
+  const navigate = (delta: number) => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + delta);
+    setSelectedDate(d);
+  };
+
+  const handleQuickAdd = (title: string) => {
+    createTask.mutate({ title, priority: "medium", isRecurring: false, tagIds: [], plannedDate: dateStr });
+  };
 
   const handleCreateOrUpdate = (payload: any) => {
+    const d = { ...payload, plannedDate: payload.plannedDate || dateStr };
     if (editingTask) {
-      updateTask.mutate({ id: editingTask.id, data: payload }, {
+      updateTask.mutate({ id: editingTask.id, data: d }, {
         onSuccess: () => { setIsModalOpen(false); setEditingTask(null); },
       });
     } else {
-      createTask.mutate(payload, { onSuccess: () => setIsModalOpen(false) });
+      createTask.mutate(d, { onSuccess: () => setIsModalOpen(false) });
     }
   };
 
   const handleDelete = (id: number) => {
-    if (window.confirm("Bạn có chắc muốn xóa nhiệm vụ này?")) {
-      deleteTask.mutate(id);
-    }
+    if (window.confirm("Xóa nhiệm vụ này?")) deleteTask.mutate(id);
   };
 
   const handleToggle = (task: Task) => {
-    if (task.status === "done") {
-      uncompleteTask.mutate(task.id);
-    } else {
-      completeTask.mutate(task.id);
-    }
+    if (task.status === "done") uncompleteTask.mutate(task.id);
+    else completeTask.mutate(task.id);
   };
 
-  const filters: Array<{ label: string; value: FilterStatus; count: number }> = [
-    { label: "Tất cả",    value: "",         count: allItems.length },
-    { label: "Chưa xong", value: "pending",  count: pendingCount },
-    { label: "Đã xong",   value: "done",     count: doneCount },
+  const FILTERS = [
+    { value: "" as const,        label: "Tất cả",  count: totalCount,   icon: <ListChecks size={13} /> },
+    { value: "pending" as const, label: "Đang làm", count: pendingCount, icon: <Clock4 size={13} /> },
+    { value: "done" as const,    label: "Xong",     count: doneCount,    icon: <CheckCircle2 size={13} /> },
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-      {/* Toolbar */}
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "var(--space-4) var(--space-5)",
-        background: "var(--bg-surface)",
-        borderRadius: "var(--radius-lg)",
-        border: "1px solid var(--border-subtle)",
-      }}>
-        {/* Filter pills */}
-        <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
-          {filters.map(f => (
-            <button
-              key={f.value}
-              onClick={() => setFilterStatus(f.value)}
-              style={{
-                display: "flex", alignItems: "center", gap: "var(--space-2)",
-                padding: "0 var(--space-3)", height: 32,
-                borderRadius: "var(--radius-full)",
-                border: filterStatus === f.value
-                  ? "1px solid var(--accent-primary)"
-                  : "1px solid var(--border-subtle)",
-                background: filterStatus === f.value ? "var(--accent-subtle)" : "transparent",
-                color: filterStatus === f.value ? "var(--accent-primary)" : "var(--text-secondary)",
-                cursor: "pointer",
-                fontSize: "var(--text-sm)",
-                fontWeight: filterStatus === f.value ? 600 : 400,
-                transition: "all 150ms ease",
-              }}
-            >
-              {f.label}
-              <span style={{
-                minWidth: 18, height: 18,
-                borderRadius: "var(--radius-full)",
-                background: filterStatus === f.value ? "var(--accent-primary)" : "var(--bg-elevated)",
-                color: filterStatus === f.value ? "white" : "var(--text-muted)",
-                fontSize: 10, fontWeight: 700,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {f.count}
-              </span>
-            </button>
-          ))}
+    <>
+      {/* Inject keyframe styles */}
+      <style>{styleTag}</style>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+        {/* ── Hero Header ── */}
+        <div style={{
+          background: "linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-elevated) 100%)",
+          border: "1px solid var(--border-subtle)",
+          borderRadius: "var(--radius-lg)",
+          padding: "20px 24px",
+          position: "relative",
+          overflow: "hidden",
+        }}>
+          {/* Accent glow */}
+          <div style={{
+            position: "absolute", top: -60, right: -60,
+            width: 200, height: 200,
+            background: "var(--accent-glow)",
+            borderRadius: "50%", filter: "blur(70px)",
+            pointerEvents: "none",
+          }} />
+          {isPast && !isToday && (
+            <div style={{
+              position: "absolute", top: -30, left: -30,
+              width: 120, height: 120,
+              background: "rgba(248,113,113,0.08)",
+              borderRadius: "50%", filter: "blur(40px)",
+              pointerEvents: "none",
+            }} />
+          )}
+
+          <div style={{ position: "relative", zIndex: 1, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+
+            {/* Date Navigator */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button
+                onClick={() => navigate(-1)}
+                style={{
+                  width: 34, height: 34, borderRadius: "var(--radius-md)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "var(--bg-overlay)", border: "1px solid var(--border-default)",
+                  color: "var(--text-secondary)", cursor: "pointer",
+                  transition: "all 150ms ease",
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "var(--accent-subtle)";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent-primary)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--accent-primary)";
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-overlay)";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-default)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
+                }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+
+              <div style={{ textAlign: "center", minWidth: 140 }}>
+                <div style={{
+                  fontSize: 17, fontWeight: 700,
+                  color: isToday ? "var(--accent-primary)" : isPast ? "var(--color-danger)" : "var(--text-primary)",
+                  letterSpacing: "-0.01em", lineHeight: 1.2,
+                }}>
+                  {fmtDateLabel(selectedDate)}
+                </div>
+                {isPast && !isToday && (
+                  <div style={{ fontSize: 11, color: "var(--color-danger)", marginTop: 3, opacity: 0.8 }}>
+                    📅 Xem lại ngày cũ
+                  </div>
+                )}
+                {isToday && (
+                  <div style={{ fontSize: 11, color: "var(--accent-primary)", marginTop: 3, opacity: 0.7 }}>
+                    ✦ Hôm nay
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => navigate(1)}
+                style={{
+                  width: 34, height: 34, borderRadius: "var(--radius-md)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "var(--bg-overlay)", border: "1px solid var(--border-default)",
+                  color: "var(--text-secondary)", cursor: "pointer",
+                  transition: "all 150ms ease",
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "var(--accent-subtle)";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent-primary)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--accent-primary)";
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-overlay)";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-default)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
+                }}
+              >
+                <ChevronRight size={16} />
+              </button>
+
+              {!isToday && (
+                <button
+                  onClick={() => setSelectedDate(new Date())}
+                  style={{
+                    padding: "5px 12px", borderRadius: "var(--radius-full)",
+                    background: "var(--accent-subtle)", border: "1px solid var(--accent-primary)",
+                    color: "var(--accent-primary)", cursor: "pointer",
+                    fontSize: 12, fontWeight: 600,
+                    transition: "all 150ms",
+                  }}
+                >
+                  Hôm nay
+                </button>
+              )}
+
+              {/* Date picker icon */}
+              <div style={{ position: "relative" }}>
+                <input
+                  type="date" value={dateStr}
+                  onChange={e => { if (e.target.value) setSelectedDate(new Date(e.target.value + "T00:00:00")); }}
+                  style={{ opacity: 0, position: "absolute", inset: 0, cursor: "pointer", zIndex: 2 }}
+                />
+                <button style={{
+                  width: 34, height: 34, borderRadius: "var(--radius-md)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "var(--bg-overlay)", border: "1px solid var(--border-default)",
+                  color: "var(--text-secondary)", cursor: "pointer", position: "relative",
+                }}>
+                  <Calendar size={15} />
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Progress + Add */}
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              {totalCount > 0 && <ProgressRing done={doneCount} total={totalCount} />}
+              <Button variant="primary" size="sm"
+                leftIcon={<Plus size={15} />}
+                onClick={() => { setEditingTask(null); setIsModalOpen(true); }}>
+                Thêm nhiệm vụ
+              </Button>
+            </div>
+          </div>
         </div>
 
-        <Button
-          variant="primary"
-          size="sm"
-          leftIcon={<Plus size={16} />}
-          onClick={() => { setEditingTask(null); setIsModalOpen(true); }}
-        >
-          Thêm Task
-        </Button>
-      </div>
+        {/* ── Filter Tabs ── */}
+        <div style={{
+          display: "flex", gap: 6,
+          background: "var(--bg-surface)",
+          padding: "5px",
+          borderRadius: "var(--radius-lg)",
+          border: "1px solid var(--border-subtle)",
+          width: "fit-content",
+        }}>
+          {FILTERS.map(f => {
+            const active = filterStatus === f.value;
+            return (
+              <button
+                key={f.value}
+                onClick={() => setFilterStatus(f.value)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "6px 14px",
+                  borderRadius: "var(--radius-md)",
+                  border: "none",
+                  background: active ? "var(--accent-primary)" : "transparent",
+                  color: active ? "#fff" : "var(--text-secondary)",
+                  cursor: "pointer",
+                  fontWeight: active ? 600 : 400,
+                  fontSize: 13,
+                  transition: "all 180ms ease",
+                  boxShadow: active ? "0 2px 8px var(--accent-glow)" : "none",
+                }}
+              >
+                <span style={{ opacity: active ? 1 : 0.6 }}>{f.icon}</span>
+                {f.label}
+                <span style={{
+                  padding: "1px 6px",
+                  borderRadius: "var(--radius-full)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  background: active ? "rgba(255,255,255,0.25)" : "var(--bg-overlay)",
+                  color: active ? "#fff" : "var(--text-muted)",
+                  minWidth: 20,
+                  textAlign: "center",
+                }}>
+                  {f.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-      {/* Task list */}
-      {isLoading ? (
-        <SkeletonList count={5} />
-      ) : allTasks.length === 0 ? (
-        <EmptyState
-          icon={<CheckSquare size={48} />}
-          title="Không có nhiệm vụ nào"
-          description={filterStatus === "done"
-            ? "Bạn chưa hoàn thành nhiệm vụ nào."
-            : "Thêm nhiệm vụ mới để bắt đầu."}
-          action={filterStatus === ""
-            ? { label: "+ Thêm nhiệm vụ", onClick: () => setIsModalOpen(true) }
-            : undefined}
-        />
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          {allTasks.map((task, idx) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              index={idx}
-              onEdit={t => { setEditingTask(t); setIsModalOpen(true); }}
-              onDelete={handleDelete}
-              onToggle={handleToggle}
+        {/* ── Quick Add ── */}
+        <QuickAdd onAdd={handleQuickAdd} />
+
+        {/* ── Task List ── */}
+        {isLoading ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <SkeletonTaskCard delay={0} />
+            <SkeletonTaskCard delay={80} />
+            <SkeletonTaskCard delay={160} />
+          </div>
+        ) : error ? (
+          <div style={{
+            textAlign: "center", padding: 32,
+            color: "var(--color-danger)",
+            background: "rgba(248,113,113,0.06)",
+            borderRadius: "var(--radius-lg)",
+            border: "1px solid rgba(248,113,113,0.2)",
+          }}>
+            <AlertCircle size={32} style={{ marginBottom: 8, opacity: 0.7 }} />
+            <div style={{ fontWeight: 600 }}>Lỗi tải dữ liệu</div>
+            <div style={{ fontSize: 12, marginTop: 4, color: "var(--text-muted)" }}>Vui lòng kiểm tra kết nối và thử lại.</div>
+          </div>
+        ) : tasks.length === 0 ? (
+          <div style={{
+            background: "var(--bg-surface)",
+            border: "1px dashed var(--border-default)",
+            borderRadius: "var(--radius-lg)",
+            padding: "40px 24px",
+          }}>
+            <EmptyState
+              icon={filterStatus === "done"
+                ? <CheckCircle2 size={44} />
+                : filterStatus === "pending"
+                ? <FilterX size={44} />
+                : <CheckSquare2 size={44} />
+              }
+              title={
+                filterStatus === "done" ? "Chưa hoàn thành gì hôm nay" :
+                filterStatus === "pending" ? "Không còn việc nào đang chờ" :
+                isToday ? "Hôm nay chưa có nhiệm vụ nào" :
+                "Không có nhiệm vụ ngày này"
+              }
+              description={filterStatus === "" && isToday ? "Dùng ô nhập nhanh bên trên hoặc nhấn nút để thêm nhiệm vụ." : ""}
+              action={filterStatus === "" ? { label: "Thêm nhiệm vụ", onClick: () => setIsModalOpen(true) } : undefined}
             />
-          ))}
-        </div>
-      )}
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {/* Section dividers: pending vs done */}
+            {filterStatus !== "done" && tasks.filter(t => t.status !== "done").length > 0 && (
+              <>
+                {filterStatus === "" && tasks.filter(t => t.status === "done").length > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                    <Clock4 size={12} color="var(--text-muted)" />
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                      Đang làm · {tasks.filter(t => t.status !== "done").length}
+                    </span>
+                    <div style={{ flex: 1, height: 1, background: "var(--border-subtle)" }} />
+                  </div>
+                )}
+                {tasks.filter(t => t.status !== "done").map((task, i) => {
+                  const pd = parsePlannedDate(task.plannedDate);
+                  const isOverdue = !!(pd && pd < new Date(new Date().setHours(0, 0, 0, 0)) && task.status !== "done");
+                  return (
+                    <TaskCard
+                      key={task.id} task={task} isOverdue={isOverdue} index={i}
+                      onEdit={() => { setEditingTask(task); setIsModalOpen(true); }}
+                      onDelete={() => handleDelete(task.id)}
+                      onToggle={() => handleToggle(task)}
+                    />
+                  );
+                })}
+              </>
+            )}
 
-      <TaskFormModal
-        isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setEditingTask(null); }}
-        onSubmit={handleCreateOrUpdate}
-        initialData={editingTask}
-        isLoading={createTask.isPending || updateTask.isPending}
-      />
-    </div>
+            {/* Done section */}
+            {filterStatus !== "pending" && tasks.filter(t => t.status === "done").length > 0 && (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: filterStatus === "" ? 10 : 0, marginBottom: 2 }}>
+                  <CheckCircle2 size={12} color="var(--color-success)" />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-success)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Đã xong · {tasks.filter(t => t.status === "done").length}
+                  </span>
+                  <div style={{ flex: 1, height: 1, background: "var(--border-subtle)" }} />
+                </div>
+                {tasks.filter(t => t.status === "done").map((task, i) => {
+                  const pd = parsePlannedDate(task.plannedDate);
+                  const isOverdue = !!(pd && pd < new Date(new Date().setHours(0, 0, 0, 0)) && task.status !== "done");
+                  return (
+                    <TaskCard
+                      key={task.id} task={task} isOverdue={isOverdue}
+                      index={tasks.filter(t => t.status !== "done").length + i}
+                      onEdit={() => { setEditingTask(task); setIsModalOpen(true); }}
+                      onDelete={() => handleDelete(task.id)}
+                      onToggle={() => handleToggle(task)}
+                    />
+                  );
+                })}
+              </>
+            )}
+
+    
+          </div>
+        )}
+
+        <TaskFormModal
+          isOpen={isModalOpen}
+          onClose={() => { setIsModalOpen(false); setEditingTask(null); }}
+          onSubmit={handleCreateOrUpdate}
+          initialData={editingTask}
+          isLoading={createTask.isPending || updateTask.isPending}
+        />
+      </div>
+    </>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { CheckCircle, Circle, ArrowRight, TrendingUp, ListTodo, CheckCheck, Clock, FileText } from "lucide-react";
+import { CheckCircle2, Circle, ArrowRight, ListTodo, CheckCheck, Clock, FileText } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTasks, useCompleteTask, useUncompleteTask } from "../tasks/hooks/useTasks";
 import { Button } from "../../components/ui/Button";
@@ -8,11 +8,12 @@ import { useCountdowns } from "../countdown/hooks/useCountdowns";
 import { calcDaysRemaining, fmtDays } from "../countdown/CountdownPage";
 import { useDailyNote, useUpsertDailyNote } from "../notes/hooks/useNotes";
 import ReactMarkdown from "react-markdown";
+import { getTodayInTz, getStoredTimezone } from "../../stores/timezoneStore";
 
-const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  high:   { label: "Cao",  color: "var(--priority-high)",   bg: "rgba(248,113,113,0.12)" },
-  medium: { label: "Vừa", color: "var(--priority-medium)", bg: "rgba(255,179,71,0.12)" },
-  low:    { label: "Thấp", color: "var(--priority-low)",   bg: "rgba(82,215,191,0.12)" },
+const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string; glow: string }> = {
+  high:   { label: "Cao",  color: "var(--priority-high)",   bg: "rgba(248,113,113,0.12)", glow: "rgba(248,113,113,0.3)" },
+  medium: { label: "Vừa", color: "var(--priority-medium)", bg: "rgba(255,179,71,0.12)",  glow: "rgba(255,179,71,0.3)" },
+  low:    { label: "Thấp", color: "var(--priority-low)",   bg: "rgba(82,215,191,0.12)",  glow: "rgba(82,215,191,0.3)" },
 };
 
 // Mini calendar widget (current month, read-only)
@@ -77,8 +78,92 @@ const MiniCalendar: React.FC = () => {
   );
 };
 
+// ── DashTaskItem ────────────────────────────────────────────────────────────
+const DashTaskItem: React.FC<{
+  task: { id: number; title: string; status: string; priority: string };
+  pri: { label: string; color: string; bg: string; glow: string };
+  idx: number;
+  isDone: boolean;
+  onToggle: () => void;
+}> = ({ task, pri, idx, isDone, onToggle }) => {
+  const [hover, setHover] = useState(false);
+  const [bouncing, setBouncing] = useState(false);
+
+  const handleToggle = () => {
+    setBouncing(true);
+    setTimeout(() => setBouncing(false), 350);
+    onToggle();
+  };
+
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "10px 14px",
+        borderRadius: "var(--radius-md)",
+        border: `1px solid ${hover && !isDone ? "var(--border-default)" : "var(--border-subtle)"}`,
+        borderLeft: `3px solid ${isDone ? "var(--border-subtle)" : pri.color}`,
+        background: isDone ? "transparent" : hover ? "var(--bg-elevated)" : "var(--bg-surface)",
+        transition: "all 160ms ease",
+        boxShadow: hover && !isDone ? `0 3px 12px rgba(0,0,0,0.15)` : "none",
+        opacity: isDone ? 0.55 : 1,
+        animation: `slideInLeft 200ms ${idx * 40}ms ease both`,
+        cursor: "default",
+      }}
+    >
+      {/* Priority dot */}
+      <div style={{
+        width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+        background: isDone ? "var(--border-default)" : pri.color,
+        boxShadow: !isDone && hover ? `0 0 6px ${pri.glow}` : "none",
+        transition: "box-shadow 200ms ease",
+      }} />
+
+      {/* Toggle */}
+      <button
+        onClick={handleToggle}
+        style={{
+          background: "none", border: "none", cursor: "pointer", padding: 0,
+          color: isDone ? "var(--color-success)" : hover ? "var(--color-success)" : "var(--text-muted)",
+          flexShrink: 0, display: "flex", alignItems: "center",
+          transition: "color 150ms ease, transform 150ms ease",
+          transform: bouncing ? "scale(1.3)" : "scale(1)",
+        }}
+      >
+        {isDone ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+      </button>
+
+      {/* Title */}
+      <span style={{
+        flex: 1, fontSize: 13, fontWeight: 500,
+        color: isDone ? "var(--text-muted)" : "var(--text-primary)",
+        textDecoration: isDone ? "line-through" : "none",
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        letterSpacing: "0.01em",
+      }}>
+        {task.title}
+      </span>
+
+      {/* Priority badge */}
+      <span style={{
+        padding: "2px 8px", borderRadius: "var(--radius-full)",
+        fontSize: 10, fontWeight: 700,
+        color: isDone ? "var(--text-muted)" : pri.color,
+        background: isDone ? "var(--bg-overlay)" : pri.bg,
+        border: `1px solid ${isDone ? "transparent" : pri.color}25`,
+        flexShrink: 0,
+      }}>
+        {pri.label}
+      </span>
+    </div>
+  );
+};
+
 export const DashboardPage: React.FC = () => {
-  const today = new Date().toISOString().split("T")[0];
+  // Use timezone-aware date for today — fixes UTC vs local date mismatch
+  const today = getTodayInTz();
   const { data, isLoading } = useTasks({ plannedDate: today });
   const { data: countdownsData } = useCountdowns();
   const completeTask = useCompleteTask();
@@ -113,10 +198,16 @@ export const DashboardPage: React.FC = () => {
   const pending = tasks.filter(t => t.status !== "done").length;
   const progress = tasks.length > 0 ? (done / tasks.length) * 100 : 0;
 
+  // Format today's label using user's timezone (not browser OS timezone)
   const todayFmt = (() => {
-    const d = new Date();
-    const days = ["Chủ nhật","Thứ hai","Thứ ba","Thứ tư","Thứ năm","Thứ sáu","Thứ bảy"];
-    return `${days[d.getDay()]}, ${d.getDate()} tháng ${d.getMonth()+1}`;
+    const tz = getStoredTimezone();
+    const now = new Date();
+    return new Intl.DateTimeFormat("vi-VN", {
+      timeZone: tz,
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(now);
   })();
 
   const statCards = [
@@ -229,32 +320,35 @@ export const DashboardPage: React.FC = () => {
               background:"var(--bg-surface)",
               borderRadius:"var(--radius-lg)",
               border:"1px solid var(--border-subtle)",
+              borderTop:`2px solid ${c.color}`,
               display:"flex",
               alignItems:"center",
               gap:"var(--space-4)",
-              transition:"border-color 200ms ease,box-shadow 200ms ease",
+              transition:"border-color 200ms ease,box-shadow 200ms ease,transform 200ms ease",
+              cursor:"default",
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLDivElement).style.borderColor="var(--border-default)";
-              (e.currentTarget as HTMLDivElement).style.boxShadow="var(--shadow-md)";
+              (e.currentTarget as HTMLDivElement).style.boxShadow=`0 6px 20px rgba(0,0,0,0.2), 0 0 0 1px ${c.color}33`;
+              (e.currentTarget as HTMLDivElement).style.transform="translateY(-2px)";
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLDivElement).style.borderColor="var(--border-subtle)";
               (e.currentTarget as HTMLDivElement).style.boxShadow="none";
+              (e.currentTarget as HTMLDivElement).style.transform="translateY(0)";
             }}
           >
             <div style={{
-              width:44,height:44,borderRadius:"var(--radius-md)",
+              width:46,height:46,borderRadius:"var(--radius-md)",
               background:c.bg,color:c.color,
               display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+              boxShadow:`0 0 0 1px ${c.color}25`,
             }}>
               {c.icon}
             </div>
             <div>
-              <div style={{ fontSize:"var(--text-2xl)",fontWeight:700,color:"var(--text-primary)",lineHeight:1 }}>
+              <div style={{ fontSize:"var(--text-2xl)",fontWeight:800,color:"var(--text-primary)",lineHeight:1,letterSpacing:"-0.02em" }}>
                 {c.value}
               </div>
-              <div style={{ fontSize:"var(--text-xs)",color:"var(--text-muted)",marginTop:"var(--space-1)" }}>
+              <div style={{ fontSize:"var(--text-xs)",color:"var(--text-muted)",marginTop:"var(--space-1)",fontWeight:500 }}>
                 {c.label}
               </div>
             </div>
@@ -274,7 +368,7 @@ export const DashboardPage: React.FC = () => {
         }}>
           <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"var(--space-4)" }}>
             <h3 style={{ fontSize:"var(--text-md)",fontWeight:600,color:"var(--text-primary)",margin:0,display:"flex",alignItems:"center",gap:"var(--space-2)" }}>
-              <TrendingUp size={16} style={{ color:"var(--accent-primary)" }} />
+              <ListTodo size={16} style={{ color:"var(--accent-primary)" }} />
               Nhiệm vụ hôm nay
             </h3>
             <Link to="/tasks" style={{ textDecoration:"none" }}>
@@ -289,7 +383,7 @@ export const DashboardPage: React.FC = () => {
             <SkeletonList count={4} />
           ) : tasks.length === 0 ? (
             <div style={{ textAlign:"center",padding:"var(--space-10)",color:"var(--text-muted)" }}>
-              <CheckCircle size={40} style={{ margin:"0 auto var(--space-3)",opacity:0.25 }} />
+              <CheckCircle2 size={40} style={{ margin:"0 auto var(--space-3)",opacity:0.25 }} />
               <p style={{ margin:0,fontSize:"var(--text-sm)" }}>Không có nhiệm vụ nào</p>
               <Link to="/tasks" style={{ textDecoration:"none" }}>
                 <Button variant="primary" size="sm" style={{ marginTop:"var(--space-4)" }}>
@@ -298,52 +392,33 @@ export const DashboardPage: React.FC = () => {
               </Link>
             </div>
           ) : (
-            <div style={{ display:"flex",flexDirection:"column",gap:"var(--space-2)" }}>
+            <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
               {tasks.slice(0,8).map((task,idx) => {
-                const pri = PRIORITY_CONFIG[task.priority];
+                const pri = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
+                const isDone = task.status === "done";
                 return (
-                  <div
+                  <DashTaskItem
                     key={task.id}
-                    style={{
-                      display:"flex",alignItems:"center",gap:"var(--space-3)",
-                      padding:"var(--space-3) var(--space-4)",
-                      borderRadius:"var(--radius-md)",
-                      border:"1px solid var(--border-subtle)",
-                      borderLeft:`3px solid ${pri.color}`,
-                      background:task.status==="done"?"var(--bg-base)":"var(--bg-elevated)",
-                      transition:"all 150ms ease",
-                      animation:`slideInLeft 200ms ${idx*40}ms ease both`,
-                    }}
-                  >
-                    <button
-                      onClick={() => task.status==="done"?uncompleteTask.mutate(task.id):completeTask.mutate(task.id)}
-                      style={{ background:"none",border:"none",cursor:"pointer",padding:0,
-                        color:task.status==="done"?"var(--color-success)":"var(--text-muted)",
-                        flexShrink:0,display:"flex",alignItems:"center",transition:"color 150ms ease,transform 150ms ease",
-                      }}
-                    >
-                      {task.status==="done" ? <CheckCircle size={20} /> : <Circle size={20} />}
-                    </button>
-                    <span style={{
-                      flex:1,fontSize:"var(--text-sm)",fontWeight:500,
-                      color:task.status==="done"?"var(--text-muted)":"var(--text-primary)",
-                      textDecoration:task.status==="done"?"line-through":"none",
-                    }}>
-                      {task.title}
-                    </span>
-                    <span style={{
-                      padding:"2px 8px",borderRadius:"var(--radius-full)",
-                      fontSize:10,fontWeight:600,
-                      color:pri.color,background:pri.bg,
-                    }}>
-                      {pri.label}
-                    </span>
-                  </div>
+                    task={task}
+                    pri={pri}
+                    idx={idx}
+                    isDone={isDone}
+                    onToggle={() => isDone ? uncompleteTask.mutate(task.id) : completeTask.mutate(task.id)}
+                  />
                 );
               })}
               {tasks.length > 8 && (
                 <Link to="/tasks" style={{ textDecoration:"none" }}>
-                  <div style={{ textAlign:"center",padding:"var(--space-2)",color:"var(--accent-primary)",fontSize:"var(--text-sm)",cursor:"pointer" }}>
+                  <div style={{
+                    textAlign:"center",padding:"var(--space-2)",
+                    color:"var(--accent-primary)",fontSize:"var(--text-sm)",cursor:"pointer",
+                    borderRadius:"var(--radius-md)",
+                    border:"1px dashed var(--border-default)",
+                    transition:"background 150ms",
+                  }}
+                  onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background="var(--bg-elevated)"}
+                  onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background="transparent"}
+                  >
                     +{tasks.length - 8} nhiệm vụ khác →
                   </div>
                 </Link>

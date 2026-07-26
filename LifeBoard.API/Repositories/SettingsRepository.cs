@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using LifeBoard.API.Infrastructure;
 using LifeBoard.API.Models.Entities;
 using LifeBoard.API.Repositories.Interfaces;
@@ -27,7 +27,8 @@ public class SettingsRepository(DbConnectionFactory db) : ISettingsRepository
         var sql = @"
             UPDATE settings SET theme = @Theme, pomodoro_focus_minutes = @PomodoroFocusMinutes, 
             pomodoro_break_minutes = @PomodoroBreakMinutes, pomodoro_rounds = @PomodoroRounds, 
-            habit_grace_period_days = @HabitGracePeriodDays, language = @Language
+            habit_grace_period_days = @HabitGracePeriodDays, language = @Language,
+            timezone = @Timezone
             WHERE id = 1";
         await conn.ExecuteAsync(sql, settings);
         return await GetAsync();

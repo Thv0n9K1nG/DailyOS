@@ -1,4 +1,4 @@
-﻿namespace LifeBoard.API.Models.DTOs;
+namespace LifeBoard.API.Models.DTOs;
 
 public class SettingsDto
 {
@@ -8,4 +8,5 @@ public class SettingsDto
     public int PomodoroRounds { get; set; } = 4;
     public int HabitGracePeriodDays { get; set; } = 0;
     public string Language { get; set; } = "vi";
+    public string Timezone { get; set; } = "Asia/Ho_Chi_Minh";
 }

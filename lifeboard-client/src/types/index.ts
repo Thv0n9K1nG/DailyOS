@@ -1,4 +1,4 @@
-﻿// ── Enums ────────────────────────────────────────────────────
+// ── Enums ────────────────────────────────────────────────────
 export type Priority       = "low" | "medium" | "high";
 export type TaskStatus     = "pending" | "in_progress" | "done" | "archived";
 export type RecurrenceType = "daily" | "weekly" | "monthly";
@@ -85,6 +85,7 @@ export interface CreateCountdownDto { title: string; targetDate: string; icon?: 
 export interface Settings {
   theme: Theme; pomodoroFocusMinutes: number; pomodoroBreakMinutes: number;
   pomodoroRounds: number; habitGracePeriodDays: number; language: string;
+  timezone: string;
 }
 
 // ── Analytics ────────────────────────────────────────────────

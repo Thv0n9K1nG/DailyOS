@@ -1,4 +1,4 @@
-﻿import api from '../../../lib/api';
+import api from '../../../lib/api';
 
 export interface Settings {
   theme: 'light' | 'dark';
@@ -7,6 +7,7 @@ export interface Settings {
   pomodoroRounds: number;
   habitGracePeriodDays: number;
   language: string;
+  timezone: string;
 }
 
 export const settingsApi = {
