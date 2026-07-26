@@ -69,6 +69,68 @@ export function fmtNowInTz(tz?: string): string {
   }).format(new Date());
 }
 
+/**
+ * Format deadline ISO string sang HH:mm (hoặc HH:mm - DD/MM) theo timezone.
+ */
+export function fmtDeadlineTime(isoStr?: string, tz?: string): string {
+  if (!isoStr) return "";
+  const zone = tz ?? getStoredTimezone();
+  const normalized = /[Zz]|[+-]\d{2}:?\d{2}$/.test(isoStr) ? isoStr : isoStr + "Z";
+  const dt = new Date(normalized);
+  if (isNaN(dt.getTime())) return "";
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: zone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(dt);
+}
+
+export interface DeadlineInfo {
+  status: "overdue" | "due_soon" | "normal" | "none";
+  label: string;
+  timeStr: string;
+}
+
+/**
+ * Tính toán trạng thái Deadline cho một task dựa trên timezone của user:
+ * - overdue: Đã quá deadline
+ * - due_soon: Còn dưới 2 tiếng
+ * - normal: Đã set deadline và còn đủ thời gian
+ * - none: Không có deadline
+ */
+export function getDeadlineInfo(deadlineIsoStr?: string, isDone?: boolean, tz?: string): DeadlineInfo {
+  if (!deadlineIsoStr || isDone) {
+    return { status: "none", label: "", timeStr: "" };
+  }
+
+  const zone = tz ?? getStoredTimezone();
+  const normalized = /[Zz]|[+-]\d{2}:?\d{2}$/.test(deadlineIsoStr) ? deadlineIsoStr : deadlineIsoStr + "Z";
+  const deadlineDt = new Date(normalized);
+  if (isNaN(deadlineDt.getTime())) {
+    return { status: "none", label: "", timeStr: "" };
+  }
+
+  const now = new Date();
+  const diffMs = deadlineDt.getTime() - now.getTime();
+  const timeStr = fmtDeadlineTime(deadlineIsoStr, zone);
+
+  if (diffMs < 0) {
+    return { status: "overdue", label: `Quá hạn (${timeStr})`, timeStr };
+  }
+
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes <= 120) {
+    const hours = Math.floor(diffMinutes / 60);
+    const mins = diffMinutes % 60;
+    const remainingText = hours > 0 ? `Còn ${hours}h ${mins}p` : `Còn ${mins}p`;
+    return { status: "due_soon", label: `${remainingText} (${timeStr})`, timeStr };
+  }
+
+  return { status: "normal", label: `Hạn chót: ${timeStr}`, timeStr };
+}
+
 interface TimezoneStore {
   timezone: string;
   setTimezone: (tz: string) => void;
@@ -81,3 +143,4 @@ export const useTimezoneStore = create<TimezoneStore>((set) => ({
     set({ timezone: tz });
   },
 }));
+

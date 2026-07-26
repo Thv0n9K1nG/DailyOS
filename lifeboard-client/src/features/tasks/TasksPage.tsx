@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import {
   Plus, CheckCircle2, Circle, Trash2, Edit2, ChevronLeft, ChevronRight,
   Calendar, AlertCircle, Flame, AlignLeft, CheckSquare2,
-  ListChecks, Clock4, FilterX,
+  ListChecks, Clock4, FilterX, Clock, Zap, ShieldCheck, Tag as TagIcon,
+  LayoutGrid, List, FileText,
 } from "lucide-react";
 
 import {
@@ -13,7 +14,7 @@ import { Task } from "./api/taskApi";
 import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { TaskFormModal } from "./TaskFormModal";
-import { getTodayInTz, getStoredTimezone } from "../../stores/timezoneStore";
+import { getTodayInTz, getStoredTimezone, getDeadlineInfo } from "../../stores/timezoneStore";
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 /**
@@ -88,9 +89,9 @@ function fmtCompletedAt(isoStr: string): string {
 }
 
 const PRIORITY = {
-  high:   { label: "Cao",  color: "var(--priority-high)",   bg: "rgba(248,113,113,0.12)", glow: "rgba(248,113,113,0.25)", icon: <Flame size={10} /> },
-  medium: { label: "Vừa", color: "var(--priority-medium)", bg: "rgba(255,179,71,0.12)",  glow: "rgba(255,179,71,0.25)",  icon: null },
-  low:    { label: "Thấp", color: "var(--priority-low)",   bg: "rgba(82,215,191,0.12)",  glow: "rgba(82,215,191,0.25)",  icon: null },
+  high:   { label: "Cao",  color: "var(--priority-high)",   bg: "rgba(248,113,113,0.14)", glow: "rgba(248,113,113,0.3)", icon: <Flame size={11} /> },
+  medium: { label: "Vừa", color: "var(--priority-medium)", bg: "rgba(255,179,71,0.14)",  glow: "rgba(255,179,71,0.3)",  icon: <Zap size={11} /> },
+  low:    { label: "Thấp", color: "var(--priority-low)",   bg: "rgba(82,215,191,0.14)",  glow: "rgba(82,215,191,0.3)",  icon: <ShieldCheck size={11} /> },
 };
 
 /* ── Inline CSS for animations ────────────────────────────────────────────── */
@@ -208,7 +209,7 @@ const QuickAdd = ({ onAdd }: { onAdd: (title: string) => void }) => {
         onKeyDown={e => e.key === "Enter" && submit()}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        placeholder="Thêm nhanh nhiệm vụ… nhấn Enter để lưu"
+        placeholder="Thêm nhanh nhiệm vụ… nhấn Enter để lưu (mặc định deadline 23:59)"
         style={{
           flex: 1, background: "none", border: "none", outline: "none",
           color: "var(--text-primary)", fontSize: 14,
@@ -242,8 +243,8 @@ const SkeletonTaskCard = ({ delay = 0 }: { delay?: number }) => (
   }} className="skeleton-shimmer" />
 );
 
-/* ── Task Card ────────────────────────────────────────────────────────────── */
-const TaskCard: React.FC<{
+/* ── Grid Task Card (Ô Vuông) ─────────────────────────────────────────────── */
+const GridTaskCard: React.FC<{
   task: Task; isOverdue: boolean; index: number;
   onEdit: () => void; onDelete: () => void; onToggle: () => void;
 }> = ({ task, isOverdue, index, onEdit, onDelete, onToggle }) => {
@@ -251,6 +252,7 @@ const TaskCard: React.FC<{
   const [checking, setChecking] = useState(false);
   const isDone = task.status === "done";
   const pri = PRIORITY[task.priority as keyof typeof PRIORITY] ?? PRIORITY.medium;
+  const deadlineInfo = getDeadlineInfo(task.deadline, isDone);
 
   const handleToggle = () => {
     setChecking(true);
@@ -258,9 +260,10 @@ const TaskCard: React.FC<{
     onToggle();
   };
 
+  const isActuallyOverdue = isOverdue || deadlineInfo.status === "overdue";
   const borderColor = isDone
     ? "var(--border-subtle)"
-    : isOverdue
+    : isActuallyOverdue
     ? "var(--color-danger)"
     : pri.color;
 
@@ -270,165 +273,179 @@ const TaskCard: React.FC<{
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        display: "flex", alignItems: "center", gap: 12,
-        padding: "13px 16px",
+        display: "flex", flexDirection: "column", justifyContent: "space-between",
+        gap: 12,
+        padding: "16px",
         background: isDone
-          ? "transparent"
+          ? "var(--bg-base)"
           : hover
           ? "var(--bg-elevated)"
           : "var(--bg-surface)",
-        borderRadius: "var(--radius-md)",
+        borderRadius: "var(--radius-lg)",
         border: `1px solid ${hover && !isDone ? "var(--border-default)" : "var(--border-subtle)"}`,
-        borderLeft: `3px solid ${borderColor}`,
-        transition: "all 160ms ease",
-        boxShadow: hover && !isDone ? `0 4px 16px rgba(0,0,0,0.18), inset 0 0 0 0 transparent` : "none",
-        opacity: isDone ? 0.55 : 1,
-        animationDelay: `${index * 45}ms`,
+        borderTop: `4px solid ${borderColor}`,
+        transition: "all 200ms ease",
+        boxShadow: hover && !isDone ? `0 8px 24px rgba(0,0,0,0.22), 0 0 0 1px ${pri.color}30` : "none",
+        transform: hover && !isDone ? "translateY(-3px)" : "translateY(0)",
+        opacity: isDone ? 0.6 : 1,
+        animationDelay: `${index * 40}ms`,
         position: "relative",
         overflow: "hidden",
+        minHeight: 160,
       }}
     >
-      {/* Hover shimmer line */}
-      {hover && !isDone && (
-        <div style={{
-          position: "absolute", top: 0, left: 0, right: 0, height: 1,
-          background: `linear-gradient(90deg, transparent, ${pri.color}66, transparent)`,
-        }} />
-      )}
+      {/* Top bar: Priority Badge + Hover Actions + Checkbox */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 4,
+          padding: "3px 9px", borderRadius: "var(--radius-full)",
+          fontSize: 10, fontWeight: 700,
+          color: isDone ? "var(--text-muted)" : pri.color,
+          background: isDone ? "var(--bg-overlay)" : pri.bg,
+          border: `1px solid ${isDone ? "transparent" : pri.color}40`,
+          boxShadow: !isDone ? `0 0 6px ${pri.glow}` : "none",
+        }}>
+          {pri.icon} {pri.label}
+        </span>
 
-      {/* Toggle checkbox */}
-      <button
-        onClick={handleToggle}
-        className={checking ? "check-bounce" : ""}
-        style={{
-          background: "none", border: "none", cursor: "pointer",
-          padding: 2, flexShrink: 0,
-          color: isDone ? "var(--color-success)" : isOverdue ? "var(--color-danger)" : "var(--text-muted)",
-          transition: "color 150ms, transform 150ms",
-          display: "flex", alignItems: "center",
-        }}
-        onMouseEnter={e => { if (!isDone) (e.currentTarget as HTMLButtonElement).style.color = "var(--color-success)"; }}
-        onMouseLeave={e => { if (!isDone) (e.currentTarget as HTMLButtonElement).style.color = isOverdue ? "var(--color-danger)" : "var(--text-muted)"; }}
-      >
-        {isDone
-          ? <CheckCircle2 size={20} />
-          : <Circle size={20} />
-        }
-      </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Actions on hover */}
+          <div style={{
+            display: "flex", gap: 4, opacity: hover ? 1 : 0,
+            transition: "opacity 150ms ease",
+          }}>
+            <button
+              onClick={onEdit}
+              title="Chỉnh sửa"
+              style={{
+                width: 26, height: 26, borderRadius: "var(--radius-sm)",
+                background: "var(--bg-overlay)", border: "1px solid var(--border-default)",
+                color: "var(--text-secondary)", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <Edit2 size={12} />
+            </button>
+            <button
+              onClick={onDelete}
+              title="Xóa"
+              style={{
+                width: 26, height: 26, borderRadius: "var(--radius-sm)",
+                background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.25)",
+                color: "#f87171", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Toggle checkbox */}
+          <button
+            onClick={handleToggle}
+            className={checking ? "check-bounce" : ""}
+            style={{
+              background: "none", border: "none", cursor: "pointer", padding: 0,
+              color: isDone ? "var(--color-success)" : isActuallyOverdue ? "var(--color-danger)" : "var(--text-muted)",
+              display: "flex", alignItems: "center",
+              transition: "color 150ms, transform 150ms",
+            }}
+          >
+            {isDone ? <CheckCircle2 size={22} /> : <Circle size={22} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Middle: Title & Description Note Container */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
         <div style={{
-          fontSize: 14, fontWeight: 500,
-          color: isDone ? "var(--text-muted)" : isOverdue ? "var(--color-danger)" : "var(--text-primary)",
+          fontSize: 15, fontWeight: 700,
+          color: isDone ? "var(--text-muted)" : isActuallyOverdue ? "var(--color-danger)" : "var(--text-primary)",
           textDecoration: isDone ? "line-through" : "none",
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          letterSpacing: "0.01em",
+          lineHeight: 1.35, letterSpacing: "-0.01em",
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
         }}>
           {task.title}
         </div>
 
-        {task.description && !isDone && (
+        {/* Note / Description Box */}
+        {task.description && (
           <div style={{
-            fontSize: 12, color: "var(--text-secondary)", marginTop: 3,
-            display: "flex", alignItems: "center", gap: 4,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            background: "var(--bg-overlay)",
+            border: "1px solid var(--border-subtle)",
+            borderRadius: "var(--radius-md)",
+            padding: "8px 10px",
+            fontSize: 12,
+            color: "var(--text-secondary)",
+            lineHeight: 1.45,
+            display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
           }}>
-            <AlignLeft size={10} style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 4, marginBottom: 3, fontWeight: 600 }}>
+              <FileText size={10} /> Ghi chú:
+            </span>
             {task.description}
           </div>
         )}
+      </div>
 
-        {/* Badges */}
-        <div style={{ display: "flex", gap: 5, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{
-            display: "inline-flex", alignItems: "center", gap: 3,
-            padding: "2px 8px",
-            borderRadius: "var(--radius-full)",
-            fontSize: 10, fontWeight: 600,
-            color: isDone ? "var(--text-muted)" : pri.color,
-            background: isDone ? "var(--bg-overlay)" : pri.bg,
-            border: `1px solid ${isDone ? "transparent" : pri.color}30`,
-          }}>
-            {pri.icon}{pri.label}
-          </span>
-
-          {isOverdue && !isDone && (
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: 3,
-              padding: "2px 8px",
-              borderRadius: "var(--radius-full)",
-              fontSize: 10, fontWeight: 600,
-              color: "var(--color-danger)",
-              background: "rgba(248,113,113,0.1)",
-              border: "1px solid rgba(248,113,113,0.25)",
-            }}>
-              <AlertCircle size={9} />Quá hạn
+      {/* Footer: Deadline & Tags */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 6, borderTop: "1px dashed var(--border-subtle)" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+          {/* Deadline Badge */}
+          {!isDone && deadlineInfo.status === "overdue" && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: "var(--radius-full)", fontSize: 10, fontWeight: 700, color: "#f87171", background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.35)" }}>
+              <AlertCircle size={10} /> {deadlineInfo.label}
+            </span>
+          )}
+          {!isDone && deadlineInfo.status === "due_soon" && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: "var(--radius-full)", fontSize: 10, fontWeight: 700, color: "var(--color-warning)", background: "rgba(255,179,71,0.15)", border: "1px solid rgba(255,179,71,0.35)", animation: "pulse 1.8s infinite" }}>
+              <Clock size={10} /> ⚡ {deadlineInfo.label}
+            </span>
+          )}
+          {!isDone && deadlineInfo.status === "normal" && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: "var(--radius-full)", fontSize: 10, fontWeight: 600, color: "var(--color-info)", background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.25)" }}>
+              <Clock size={10} /> {deadlineInfo.label}
+            </span>
+          )}
+          {!isDone && deadlineInfo.status === "none" && (
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
+              Chưa có deadline
             </span>
           )}
 
+          {/* Completion timestamp */}
           {isDone && task.completedAt && (
-            <span style={{
-              fontSize: 10, color: "var(--color-success)",
-              display: "flex", alignItems: "center", gap: 3,
-            }}>
+            <span style={{ fontSize: 10, color: "var(--color-success)", fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
               ✓ {fmtCompletedAt(task.completedAt)}
             </span>
           )}
         </div>
-      </div>
 
-      {/* Actions */}
-      <div style={{
-        display: "flex", gap: 4, flexShrink: 0,
-        opacity: hover ? 1 : 0,
-        transform: hover ? "translateX(0)" : "translateX(6px)",
-        transition: "opacity 150ms, transform 150ms",
-      }}>
-        <button
-          onClick={onEdit}
-          title="Chỉnh sửa"
-          style={{
-            width: 28, height: 28, borderRadius: "var(--radius-sm)",
-            background: "var(--bg-overlay)",
-            border: "1px solid var(--border-default)",
-            color: "var(--text-secondary)", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "all 150ms",
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = "var(--accent-subtle)";
-            (e.currentTarget as HTMLButtonElement).style.color = "var(--accent-primary)";
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-overlay)";
-            (e.currentTarget as HTMLButtonElement).style.color = "var(--text-secondary)";
-          }}
-        >
-          <Edit2 size={12} />
-        </button>
-        <button
-          onClick={onDelete}
-          title="Xóa"
-          style={{
-            width: 28, height: 28, borderRadius: "var(--radius-sm)",
-            background: "rgba(248,113,113,0.07)",
-            border: "1px solid rgba(248,113,113,0.2)",
-            color: "var(--color-danger)", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "all 150ms",
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = "rgba(248,113,113,0.18)";
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLButtonElement).style.background = "rgba(248,113,113,0.07)";
-          }}
-        >
-          <Trash2 size={12} />
-        </button>
+        {/* Tags */}
+        {task.tags && task.tags.length > 0 && (
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {task.tags.map(t => (
+              <span key={t.id} style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "1px 6px", borderRadius: "var(--radius-full)", fontSize: 9, fontWeight: 600, color: t.color || "var(--text-secondary)", background: "var(--bg-overlay)", border: "1px solid var(--border-subtle)" }}>
+                <TagIcon size={8} /> {t.name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
+  );
+};
+
+/* ── Task Card Router (Grid vs List wrapper) ───────────────────────────────── */
+const TaskCard: React.FC<{
+  task: Task; isOverdue: boolean; index: number; viewMode: "grid" | "list";
+  onEdit: () => void; onDelete: () => void; onToggle: () => void;
+}> = ({ task, isOverdue, index, viewMode, onEdit, onDelete, onToggle }) => {
+  return (
+    <GridTaskCard
+      task={task} isOverdue={isOverdue} index={index}
+      onEdit={onEdit} onDelete={onDelete} onToggle={onToggle}
+    />
   );
 };
 
@@ -436,6 +453,7 @@ const TaskCard: React.FC<{
 export const TasksPage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [filterStatus, setFilterStatus] = useState<"" | "pending" | "done">("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -646,52 +664,93 @@ export const TasksPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Filter Tabs ── */}
-        <div style={{
-          display: "flex", gap: 6,
-          background: "var(--bg-surface)",
-          padding: "5px",
-          borderRadius: "var(--radius-lg)",
-          border: "1px solid var(--border-subtle)",
-          width: "fit-content",
-        }}>
-          {FILTERS.map(f => {
-            const active = filterStatus === f.value;
-            return (
-              <button
-                key={f.value}
-                onClick={() => setFilterStatus(f.value)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "6px 14px",
-                  borderRadius: "var(--radius-md)",
-                  border: "none",
-                  background: active ? "var(--accent-primary)" : "transparent",
-                  color: active ? "#fff" : "var(--text-secondary)",
-                  cursor: "pointer",
-                  fontWeight: active ? 600 : 400,
-                  fontSize: 13,
-                  transition: "all 180ms ease",
-                  boxShadow: active ? "0 2px 8px var(--accent-glow)" : "none",
-                }}
-              >
-                <span style={{ opacity: active ? 1 : 0.6 }}>{f.icon}</span>
-                {f.label}
-                <span style={{
-                  padding: "1px 6px",
-                  borderRadius: "var(--radius-full)",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  background: active ? "rgba(255,255,255,0.25)" : "var(--bg-overlay)",
-                  color: active ? "#fff" : "var(--text-muted)",
-                  minWidth: 20,
-                  textAlign: "center",
-                }}>
-                  {f.count}
-                </span>
-              </button>
-            );
-          })}
+        {/* ── Filter Bar & View Mode Switcher ── */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          {/* Filter Tabs */}
+          <div style={{
+            display: "flex", gap: 6,
+            background: "var(--bg-surface)",
+            padding: "5px",
+            borderRadius: "var(--radius-lg)",
+            border: "1px solid var(--border-subtle)",
+            width: "fit-content",
+          }}>
+            {FILTERS.map(f => {
+              const active = filterStatus === f.value;
+              return (
+                <button
+                  key={f.value}
+                  onClick={() => setFilterStatus(f.value)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "6px 14px",
+                    borderRadius: "var(--radius-md)",
+                    border: "none",
+                    background: active ? "var(--accent-primary)" : "transparent",
+                    color: active ? "#fff" : "var(--text-secondary)",
+                    cursor: "pointer",
+                    fontWeight: active ? 600 : 400,
+                    fontSize: 13,
+                    transition: "all 180ms ease",
+                    boxShadow: active ? "0 2px 8px var(--accent-glow)" : "none",
+                  }}
+                >
+                  <span style={{ opacity: active ? 1 : 0.6 }}>{f.icon}</span>
+                  {f.label}
+                  <span style={{
+                    padding: "1px 6px",
+                    borderRadius: "var(--radius-full)",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    background: active ? "rgba(255,255,255,0.25)" : "var(--bg-overlay)",
+                    color: active ? "#fff" : "var(--text-muted)",
+                    minWidth: 20,
+                    textAlign: "center",
+                  }}>
+                    {f.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* View Mode Switcher */}
+          <div style={{
+            display: "flex", gap: 4,
+            background: "var(--bg-surface)",
+            padding: "4px",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--border-subtle)",
+          }}>
+            <button
+              onClick={() => setViewMode("grid")}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 12px", borderRadius: "var(--radius-sm)",
+                border: "none",
+                background: viewMode === "grid" ? "var(--bg-elevated)" : "transparent",
+                color: viewMode === "grid" ? "var(--accent-primary)" : "var(--text-muted)",
+                cursor: "pointer", fontSize: 12, fontWeight: 600,
+                transition: "all 150ms ease",
+              }}
+            >
+              <LayoutGrid size={14} /> Grid
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 12px", borderRadius: "var(--radius-sm)",
+                border: "none",
+                background: viewMode === "list" ? "var(--bg-elevated)" : "transparent",
+                color: viewMode === "list" ? "var(--accent-primary)" : "var(--text-muted)",
+                cursor: "pointer", fontSize: 12, fontWeight: 600,
+                transition: "all 150ms ease",
+              }}
+            >
+              <List size={14} /> List
+            </button>
+          </div>
         </div>
 
         {/* ── Quick Add ── */}
@@ -699,7 +758,12 @@ export const TasksPage: React.FC = () => {
 
         {/* ── Task List ── */}
         {isLoading ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{
+            display: viewMode === "grid" ? "grid" : "flex",
+            gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(280px, 1fr))" : undefined,
+            flexDirection: viewMode === "list" ? "column" : undefined,
+            gap: 12,
+          }}>
             <SkeletonTaskCard delay={0} />
             <SkeletonTaskCard delay={80} />
             <SkeletonTaskCard delay={160} />
@@ -741,61 +805,75 @@ export const TasksPage: React.FC = () => {
             />
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {/* Section dividers: pending vs done */}
             {filterStatus !== "done" && tasks.filter(t => t.status !== "done").length > 0 && (
-              <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {filterStatus === "" && tasks.filter(t => t.status === "done").length > 0 && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                    <Clock4 size={12} color="var(--text-muted)" />
-                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      Đang làm · {tasks.filter(t => t.status !== "done").length}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Clock4 size={13} color="var(--accent-primary)" />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "0.02em" }}>
+                      ĐANG LÀM
                     </span>
-                    <div style={{ flex: 1, height: 1, background: "var(--border-subtle)" }} />
                   </div>
                 )}
-                {tasks.filter(t => t.status !== "done").map((task, i) => {
-                  const pd = parsePlannedDate(task.plannedDate);
-                  const isOverdue = !!(pd && pd < new Date(new Date().setHours(0, 0, 0, 0)) && task.status !== "done");
-                  return (
-                    <TaskCard
-                      key={task.id} task={task} isOverdue={isOverdue} index={i}
-                      onEdit={() => { setEditingTask(task); setIsModalOpen(true); }}
-                      onDelete={() => handleDelete(task.id)}
-                      onToggle={() => handleToggle(task)}
-                    />
-                  );
-                })}
-              </>
+                <div style={{
+                  display: viewMode === "grid" ? "grid" : "flex",
+                  gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(290px, 1fr))" : undefined,
+                  flexDirection: viewMode === "list" ? "column" : undefined,
+                  gap: 14,
+                }}>
+                  {tasks.filter(t => t.status !== "done").map((task, i) => {
+                    const pd = parsePlannedDate(task.plannedDate);
+                    const isOverdue = !!(pd && pd < new Date(new Date().setHours(0, 0, 0, 0)) && task.status !== "done");
+                    return (
+                      <TaskCard
+                        key={task.id} task={task} isOverdue={isOverdue} index={i}
+                        viewMode={viewMode}
+                        onEdit={() => { setEditingTask(task); setIsModalOpen(true); }}
+                        onDelete={() => handleDelete(task.id)}
+                        onToggle={() => handleToggle(task)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
             )}
 
             {/* Done section */}
             {filterStatus !== "pending" && tasks.filter(t => t.status === "done").length > 0 && (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: filterStatus === "" ? 10 : 0, marginBottom: 2 }}>
-                  <CheckCircle2 size={12} color="var(--color-success)" />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-success)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    Đã xong · {tasks.filter(t => t.status === "done").length}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: filterStatus === "" ? 12 : 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <CheckCircle2 size={13} color="var(--color-success)" />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-success)", letterSpacing: "0.02em" }}>
+                    ĐÃ HOÀN THÀNH ({tasks.filter(t => t.status === "done").length})
                   </span>
                   <div style={{ flex: 1, height: 1, background: "var(--border-subtle)" }} />
                 </div>
-                {tasks.filter(t => t.status === "done").map((task, i) => {
-                  const pd = parsePlannedDate(task.plannedDate);
-                  const isOverdue = !!(pd && pd < new Date(new Date().setHours(0, 0, 0, 0)) && task.status !== "done");
-                  return (
-                    <TaskCard
-                      key={task.id} task={task} isOverdue={isOverdue}
-                      index={tasks.filter(t => t.status !== "done").length + i}
-                      onEdit={() => { setEditingTask(task); setIsModalOpen(true); }}
-                      onDelete={() => handleDelete(task.id)}
-                      onToggle={() => handleToggle(task)}
-                    />
-                  );
-                })}
-              </>
-            )}
 
-    
+                <div style={{
+                  display: viewMode === "grid" ? "grid" : "flex",
+                  gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(290px, 1fr))" : undefined,
+                  flexDirection: viewMode === "list" ? "column" : undefined,
+                  gap: 14,
+                }}>
+                  {tasks.filter(t => t.status === "done").map((task, i) => {
+                    const pd = parsePlannedDate(task.plannedDate);
+                    const isOverdue = !!(pd && pd < new Date(new Date().setHours(0, 0, 0, 0)) && task.status !== "done");
+                    return (
+                      <TaskCard
+                        key={task.id} task={task} isOverdue={isOverdue}
+                        index={tasks.filter(t => t.status !== "done").length + i}
+                        viewMode={viewMode}
+                        onEdit={() => { setEditingTask(task); setIsModalOpen(true); }}
+                        onDelete={() => handleDelete(task.id)}
+                        onToggle={() => handleToggle(task)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { CheckCircle2, Circle, ArrowRight, ListTodo, CheckCheck, Clock, FileText } from "lucide-react";
+import { CheckCircle2, Circle, ArrowRight, ListTodo, CheckCheck, Clock, FileText, AlertCircle, Flame, Zap, ShieldCheck } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTasks, useCompleteTask, useUncompleteTask } from "../tasks/hooks/useTasks";
 import { Button } from "../../components/ui/Button";
@@ -8,12 +8,12 @@ import { useCountdowns } from "../countdown/hooks/useCountdowns";
 import { calcDaysRemaining, fmtDays } from "../countdown/CountdownPage";
 import { useDailyNote, useUpsertDailyNote } from "../notes/hooks/useNotes";
 import ReactMarkdown from "react-markdown";
-import { getTodayInTz, getStoredTimezone } from "../../stores/timezoneStore";
+import { getTodayInTz, getStoredTimezone, getDeadlineInfo } from "../../stores/timezoneStore";
 
-const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string; glow: string }> = {
-  high:   { label: "Cao",  color: "var(--priority-high)",   bg: "rgba(248,113,113,0.12)", glow: "rgba(248,113,113,0.3)" },
-  medium: { label: "Vừa", color: "var(--priority-medium)", bg: "rgba(255,179,71,0.12)",  glow: "rgba(255,179,71,0.3)" },
-  low:    { label: "Thấp", color: "var(--priority-low)",   bg: "rgba(82,215,191,0.12)",  glow: "rgba(82,215,191,0.3)" },
+const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string; glow: string; icon: React.ReactNode }> = {
+  high:   { label: "Cao",  color: "var(--priority-high)",   bg: "rgba(248,113,113,0.14)", glow: "rgba(248,113,113,0.3)", icon: <Flame size={10} /> },
+  medium: { label: "Vừa", color: "var(--priority-medium)", bg: "rgba(255,179,71,0.14)",  glow: "rgba(255,179,71,0.3)",  icon: <Zap size={10} /> },
+  low:    { label: "Thấp", color: "var(--priority-low)",   bg: "rgba(82,215,191,0.14)",  glow: "rgba(82,215,191,0.3)",  icon: <ShieldCheck size={10} /> },
 };
 
 // Mini calendar widget (current month, read-only)
@@ -80,8 +80,8 @@ const MiniCalendar: React.FC = () => {
 
 // ── DashTaskItem ────────────────────────────────────────────────────────────
 const DashTaskItem: React.FC<{
-  task: { id: number; title: string; status: string; priority: string };
-  pri: { label: string; color: string; bg: string; glow: string };
+  task: { id: number; title: string; description?: string; status: string; priority: string; deadline?: string };
+  pri: { label: string; color: string; bg: string; glow: string; icon: React.ReactNode };
   idx: number;
   isDone: boolean;
   onToggle: () => void;
@@ -95,19 +95,22 @@ const DashTaskItem: React.FC<{
     onToggle();
   };
 
+  const deadlineInfo = getDeadlineInfo(task.deadline, isDone);
+  const isOverdue = deadlineInfo.status === "overdue";
+
   return (
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
         display: "flex", alignItems: "center", gap: 10,
-        padding: "10px 14px",
+        padding: "11px 14px",
         borderRadius: "var(--radius-md)",
         border: `1px solid ${hover && !isDone ? "var(--border-default)" : "var(--border-subtle)"}`,
-        borderLeft: `3px solid ${isDone ? "var(--border-subtle)" : pri.color}`,
+        borderLeft: `3.5px solid ${isDone ? "var(--border-subtle)" : isOverdue ? "var(--color-danger)" : pri.color}`,
         background: isDone ? "transparent" : hover ? "var(--bg-elevated)" : "var(--bg-surface)",
         transition: "all 160ms ease",
-        boxShadow: hover && !isDone ? `0 3px 12px rgba(0,0,0,0.15)` : "none",
+        boxShadow: hover && !isDone ? `0 4px 14px rgba(0,0,0,0.18)` : "none",
         opacity: isDone ? 0.55 : 1,
         animation: `slideInLeft 200ms ${idx * 40}ms ease both`,
         cursor: "default",
@@ -116,7 +119,7 @@ const DashTaskItem: React.FC<{
       {/* Priority dot */}
       <div style={{
         width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-        background: isDone ? "var(--border-default)" : pri.color,
+        background: isDone ? "var(--border-default)" : isOverdue ? "var(--color-danger)" : pri.color,
         boxShadow: !isDone && hover ? `0 0 6px ${pri.glow}` : "none",
         transition: "box-shadow 200ms ease",
       }} />
@@ -126,25 +129,70 @@ const DashTaskItem: React.FC<{
         onClick={handleToggle}
         style={{
           background: "none", border: "none", cursor: "pointer", padding: 0,
-          color: isDone ? "var(--color-success)" : hover ? "var(--color-success)" : "var(--text-muted)",
+          color: isDone ? "var(--color-success)" : isOverdue ? "var(--color-danger)" : hover ? "var(--color-success)" : "var(--text-muted)",
           flexShrink: 0, display: "flex", alignItems: "center",
           transition: "color 150ms ease, transform 150ms ease",
           transform: bouncing ? "scale(1.3)" : "scale(1)",
         }}
       >
-        {isDone ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+        {isDone ? <CheckCircle2 size={19} /> : <Circle size={19} />}
       </button>
 
-      {/* Title */}
-      <span style={{
-        flex: 1, fontSize: 13, fontWeight: 500,
-        color: isDone ? "var(--text-muted)" : "var(--text-primary)",
-        textDecoration: isDone ? "line-through" : "none",
-        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        letterSpacing: "0.01em",
-      }}>
-        {task.title}
-      </span>
+      {/* Title & Description Note preview */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{
+          display: "block", fontSize: 13, fontWeight: 600,
+          color: isDone ? "var(--text-muted)" : isOverdue ? "var(--color-danger)" : "var(--text-primary)",
+          textDecoration: isDone ? "line-through" : "none",
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          letterSpacing: "0.01em",
+        }}>
+          {task.title}
+        </span>
+        {task.description && !isDone && (
+          <span style={{
+            display: "block", fontSize: 11, color: "var(--text-muted)", marginTop: 2,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            📝 {task.description}
+          </span>
+        )}
+      </div>
+
+      {/* Deadline badge */}
+      {!isDone && deadlineInfo.status === "overdue" && (
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: "#f87171",
+          background: "rgba(248,113,113,0.14)", padding: "2px 7px",
+          borderRadius: "var(--radius-full)", border: "1px solid rgba(248,113,113,0.3)",
+          flexShrink: 0, display: "flex", alignItems: "center", gap: 3,
+        }}>
+          <AlertCircle size={9} /> Quá hạn
+        </span>
+      )}
+
+      {!isDone && deadlineInfo.status === "due_soon" && (
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: "var(--color-warning)",
+          background: "rgba(255,179,71,0.14)", padding: "2px 7px",
+          borderRadius: "var(--radius-full)", border: "1px solid rgba(255,179,71,0.3)",
+          flexShrink: 0, display: "flex", alignItems: "center", gap: 3,
+          animation: "pulse 1.8s infinite",
+        }}>
+          <Clock size={9} /> ⚡ {deadlineInfo.timeStr}
+        </span>
+      )}
+
+      {!isDone && deadlineInfo.status === "normal" && (
+        <span style={{
+          fontSize: 10, fontWeight: 600, color: "var(--color-info)",
+          background: "rgba(96,165,250,0.12)", padding: "2px 7px",
+          borderRadius: "var(--radius-full)", border: "1px solid rgba(96,165,250,0.25)",
+          flexShrink: 0, display: "flex", alignItems: "center", gap: 3,
+        }}>
+          <Clock size={9} /> {deadlineInfo.timeStr}
+        </span>
+      )}
 
       {/* Priority badge */}
       <span style={{
@@ -152,10 +200,10 @@ const DashTaskItem: React.FC<{
         fontSize: 10, fontWeight: 700,
         color: isDone ? "var(--text-muted)" : pri.color,
         background: isDone ? "var(--bg-overlay)" : pri.bg,
-        border: `1px solid ${isDone ? "transparent" : pri.color}25`,
-        flexShrink: 0,
+        border: `1px solid ${isDone ? "transparent" : pri.color}30`,
+        flexShrink: 0, display: "flex", alignItems: "center", gap: 3,
       }}>
-        {pri.label}
+        {pri.icon} {pri.label}
       </span>
     </div>
   );
