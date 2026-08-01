@@ -10,21 +10,44 @@ import { EmptyState } from "../../components/ui/EmptyState";
 import { SkeletonList } from "../../components/ui/SkeletonCard";
 import { TaskFormModal } from "../tasks/TaskFormModal";
 
+import { getStoredTimezone } from "../../stores/timezoneStore";
+
 const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   high:   { label: "Cao",  color: "var(--priority-high)",   bg: "rgba(248,113,113,0.12)" },
   medium: { label: "Vừa", color: "var(--priority-medium)", bg: "rgba(255,179,71,0.12)" },
   low:    { label: "Thấp", color: "var(--priority-low)",   bg: "rgba(82,215,191,0.12)" },
 };
 
-function formatTomorrow(date: Date) {
-  const days = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
-  return `${days[date.getDay()]}, ${date.getDate()} tháng ${date.getMonth() + 1} năm ${date.getFullYear()}`;
+function getTomorrowInTz(): string {
+  const tz = getStoredTimezone();
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(d);
+  const y = parts.find(p => p.type === "year")?.value ?? "";
+  const m = parts.find(p => p.type === "month")?.value ?? "";
+  const dy = parts.find(p => p.type === "day")?.value ?? "";
+  return `${y}-${m}-${dy}`;
+}
+
+function formatTomorrow(dateStr: string) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  const tz = getStoredTimezone();
+  const parts = new Intl.DateTimeFormat("vi-VN", {
+    timeZone: tz, weekday: "long", day: "numeric", month: "numeric", year: "numeric",
+  }).formatToParts(dt);
+  const weekday = parts.find(p => p.type === "weekday")?.value ?? "";
+  const dayNum  = parts.find(p => p.type === "day")?.value ?? "";
+  const monNum  = parts.find(p => p.type === "month")?.value ?? "";
+  const yearNum = parts.find(p => p.type === "year")?.value ?? "";
+  return `${weekday}, ${dayNum} tháng ${monNum} năm ${yearNum}`;
 }
 
 export const TomorrowPage: React.FC = () => {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().split("T")[0];
+  const tomorrowStr = getTomorrowInTz();
 
   const { data, isLoading } = useTasks({ plannedDate: tomorrowStr });
   const createTask = useCreateTask();
@@ -41,7 +64,7 @@ export const TomorrowPage: React.FC = () => {
   const lowCount  = tasks.filter(t => t.priority === "low").length;
 
   const handleCreateOrUpdate = (payload: any) => {
-    const p = { ...payload, plannedDate: new Date(tomorrowStr + "T00:00:00").toISOString() };
+    const p = { ...payload, plannedDate: payload.plannedDate || tomorrowStr };
     if (editingTask) {
       updateTask.mutate({ id: editingTask.id, data: p }, {
         onSuccess: () => { setIsModalOpen(false); setEditingTask(null); },
@@ -89,7 +112,7 @@ export const TomorrowPage: React.FC = () => {
                 Kế hoạch ngày mai
               </h2>
               <p style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)", margin: "var(--space-1) 0 0" }}>
-                {formatTomorrow(tomorrow)}
+                {formatTomorrow(tomorrowStr)}
               </p>
             </div>
           </div>
@@ -226,6 +249,7 @@ export const TomorrowPage: React.FC = () => {
         onClose={() => { setIsModalOpen(false); setEditingTask(null); }}
         onSubmit={handleCreateOrUpdate}
         initialData={editingTask}
+        defaultDate={tomorrowStr}
         isLoading={createTask.isPending || updateTask.isPending}
       />
     </div>

@@ -25,6 +25,7 @@ interface TaskFormModalProps {
   onClose: () => void;
   onSubmit: (data: CreateTaskPayload) => void;
   initialData?: Task | null;
+  defaultDate?: string;
   isLoading?: boolean;
 }
 
@@ -41,8 +42,10 @@ const PRIORITIES: Array<{
 ];
 
 export const TaskFormModal: React.FC<TaskFormModalProps> = ({
-  isOpen, onClose, onSubmit, initialData, isLoading,
+  isOpen, onClose, onSubmit, initialData, defaultDate, isLoading,
 }) => {
+  const effectiveDefaultDate = defaultDate || getTodayInTz();
+
   const {
     register,
     handleSubmit,
@@ -57,7 +60,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       title: "",
       description: "",
       priority: "medium",
-      plannedDate: getTodayInTz(),
+      plannedDate: effectiveDefaultDate,
       hasDeadline: true,
       deadlineTime: "23:59",
     },
@@ -68,31 +71,33 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const watchDeadlineTime = watch("deadlineTime");
 
   useEffect(() => {
-    if (initialData) {
-      const pDate = initialData.plannedDate?.split("T")[0] || getTodayInTz();
-      const existDeadlineTime = initialData.deadline ? fmtDeadlineTime(initialData.deadline) : "23:59";
-      reset({
-        title: initialData.title,
-        description: initialData.description || "",
-        priority: initialData.priority,
-        plannedDate: pDate,
-        hasDeadline: !!initialData.deadline,
-        deadlineTime: existDeadlineTime || "23:59",
-      });
-    } else {
-      reset({
-        title: "",
-        description: "",
-        priority: "medium",
-        plannedDate: getTodayInTz(),
-        hasDeadline: true,
-        deadlineTime: "23:59",
-      });
+    if (isOpen) {
+      if (initialData) {
+        const pDate = initialData.plannedDate ? initialData.plannedDate.split("T")[0] : effectiveDefaultDate;
+        const existDeadlineTime = initialData.deadline ? fmtDeadlineTime(initialData.deadline) : "23:59";
+        reset({
+          title: initialData.title,
+          description: initialData.description || "",
+          priority: initialData.priority,
+          plannedDate: pDate,
+          hasDeadline: !!initialData.deadline,
+          deadlineTime: existDeadlineTime || "23:59",
+        });
+      } else {
+        reset({
+          title: "",
+          description: "",
+          priority: "medium",
+          plannedDate: effectiveDefaultDate,
+          hasDeadline: true,
+          deadlineTime: "23:59",
+        });
+      }
     }
-  }, [initialData, reset, isOpen]);
+  }, [initialData, reset, isOpen, effectiveDefaultDate]);
 
   const handleFormSubmit = (data: TaskFormData) => {
-    const plannedDateStr = data.plannedDate || getTodayInTz();
+    const plannedDateStr = data.plannedDate || effectiveDefaultDate;
     
     // Construct ISO Deadline string with 23:59 default
     let deadlineIso: string | undefined = undefined;

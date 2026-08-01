@@ -882,6 +882,7 @@ export const TasksPage: React.FC = () => {
           onClose={() => { setIsModalOpen(false); setEditingTask(null); }}
           onSubmit={handleCreateOrUpdate}
           initialData={editingTask}
+          defaultDate={dateStr}
           isLoading={createTask.isPending || updateTask.isPending}
         />
       </div>

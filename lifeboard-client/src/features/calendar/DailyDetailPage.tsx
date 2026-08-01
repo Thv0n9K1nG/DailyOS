@@ -480,6 +480,7 @@ export const DailyDetailPage: React.FC = () => {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateTask}
         initialData={null}
+        defaultDate={date}
         isLoading={createTask.isPending}
       />
     </div>
