@@ -3,7 +3,7 @@ import {
   Plus, CheckCircle2, Circle, Trash2, Edit2, ChevronLeft, ChevronRight,
   Calendar, AlertCircle, Flame, AlignLeft, CheckSquare2,
   ListChecks, Clock4, FilterX, Clock, Zap, ShieldCheck, Tag as TagIcon,
-  LayoutGrid, List, FileText,
+  LayoutGrid, List, FileText, AlarmClock,
 } from "lucide-react";
 
 import {
@@ -243,6 +243,83 @@ const SkeletonTaskCard = ({ delay = 0 }: { delay?: number }) => (
   }} className="skeleton-shimmer" />
 );
 
+/* ── Completion Badge Helper ──────────────────────────────────────────────── */
+/**
+ * Returns the completion status badge for a task that is done or done_late.
+ *
+ * Logic:
+ *   - status === "done"      → green "✓ HH:mm"
+ *   - status === "done_late" + has deadline + completedAt on same plannedDate
+ *       → amber "⏰ Trễ HH:mm"  (completed in-day but after deadline)
+ *   - status === "done_late" + completedAt on a different (later) day
+ *       → red-orange "❌ Hoàn thành trễ"  (completed past the planned day)
+ */
+function getCompletionBadge(task: Task): React.ReactNode {
+  if (task.status === "done") {
+    // On time — show completion time in green
+    const timeStr = task.completedAt ? fmtCompletedAt(task.completedAt) : "";
+    return (
+      <span style={{
+        fontSize: 10, color: "var(--color-success)", fontWeight: 600,
+        display: "flex", alignItems: "center", gap: 3,
+      }}>
+        ✓ {timeStr}
+      </span>
+    );
+  }
+
+  if (task.status === "done_late") {
+    // Determine in-day vs cross-day
+    const isInDay = (() => {
+      if (!task.completedAt || !task.plannedDate) return false;
+      // Compare calendar dates in user timezone
+      const tz = getStoredTimezone();
+      const toLocalDate = (iso: string) => {
+        const normalized = /[Zz]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : iso + "Z";
+        const parts = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" })
+          .formatToParts(new Date(normalized));
+        return `${parts.find(p => p.type === "year")?.value}-${parts.find(p => p.type === "month")?.value}-${parts.find(p => p.type === "day")?.value}`;
+      };
+      const plannedDay   = task.plannedDate.split("T")[0]; // already YYYY-MM-DD from backend DATE field
+      const completedDay = toLocalDate(task.completedAt);
+      return completedDay === plannedDay;
+    })();
+
+    if (isInDay && task.completedAt) {
+      // Late, but still within the planned day → show completion time
+      const timeStr = fmtCompletedAt(task.completedAt);
+      return (
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 4,
+          padding: "2px 8px", borderRadius: "var(--radius-full)",
+          fontSize: 10, fontWeight: 700,
+          color: "#F59E0B",                          // amber
+          background: "rgba(245,158,11,0.13)",
+          border: "1px solid rgba(245,158,11,0.35)",
+        }}>
+          ⏰ Trễ {timeStr}
+        </span>
+      );
+    }
+
+    // Late across day boundary → no time, just label
+    return (
+      <span style={{
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "2px 8px", borderRadius: "var(--radius-full)",
+        fontSize: 10, fontWeight: 700,
+        color: "#F97316",                            // orange-red
+        background: "rgba(249,115,22,0.13)",
+        border: "1px solid rgba(249,115,22,0.35)",
+      }}>
+        ❌ Hoàn thành trễ
+      </span>
+    );
+  }
+
+  return null;
+}
+
 /* ── Grid Task Card (Ô Vuông) ─────────────────────────────────────────────── */
 const GridTaskCard: React.FC<{
   task: Task; isOverdue: boolean; index: number;
@@ -250,7 +327,11 @@ const GridTaskCard: React.FC<{
 }> = ({ task, isOverdue, index, onEdit, onDelete, onToggle }) => {
   const [hover, setHover] = useState(false);
   const [checking, setChecking] = useState(false);
-  const isDone = task.status === "done";
+
+  // Both "done" and "done_late" count as completed for UI purposes
+  const isDone     = task.status === "done" || task.status === "done_late";
+  const isDoneLate = task.status === "done_late";
+
   const pri = PRIORITY[task.priority as keyof typeof PRIORITY] ?? PRIORITY.medium;
   const deadlineInfo = getDeadlineInfo(task.deadline, isDone);
 
@@ -260,9 +341,10 @@ const GridTaskCard: React.FC<{
     onToggle();
   };
 
-  const isActuallyOverdue = isOverdue || deadlineInfo.status === "overdue";
+  const isActuallyOverdue = !isDone && (isOverdue || deadlineInfo.status === "overdue");
+
   const borderColor = isDone
-    ? "var(--border-subtle)"
+    ? isDoneLate ? "rgba(249,115,22,0.5)" : "var(--color-success)"
     : isActuallyOverdue
     ? "var(--color-danger)"
     : pri.color;
@@ -287,7 +369,7 @@ const GridTaskCard: React.FC<{
         transition: "all 200ms ease",
         boxShadow: hover && !isDone ? `0 8px 24px rgba(0,0,0,0.22), 0 0 0 1px ${pri.color}30` : "none",
         transform: hover && !isDone ? "translateY(-3px)" : "translateY(0)",
-        opacity: isDone ? 0.6 : 1,
+        opacity: isDone ? (isDoneLate ? 0.72 : 0.6) : 1,
         animationDelay: `${index * 40}ms`,
         position: "relative",
         overflow: "hidden",
@@ -346,7 +428,9 @@ const GridTaskCard: React.FC<{
             className={checking ? "check-bounce" : ""}
             style={{
               background: "none", border: "none", cursor: "pointer", padding: 0,
-              color: isDone ? "var(--color-success)" : isActuallyOverdue ? "var(--color-danger)" : "var(--text-muted)",
+              color: isDone
+                ? isDoneLate ? "#F97316" : "var(--color-success)"
+                : isActuallyOverdue ? "var(--color-danger)" : "var(--text-muted)",
               display: "flex", alignItems: "center",
               transition: "color 150ms, transform 150ms",
             }}
@@ -388,10 +472,14 @@ const GridTaskCard: React.FC<{
         )}
       </div>
 
-      {/* Footer: Deadline & Tags */}
+      {/* Footer: Completion badge / Deadline badges + Tags */}
       <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 6, borderTop: "1px dashed var(--border-subtle)" }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-          {/* Deadline Badge */}
+
+          {/* ── Completed state ── */}
+          {isDone && getCompletionBadge(task)}
+
+          {/* ── Pending / overdue deadline badges ── */}
           {!isDone && deadlineInfo.status === "overdue" && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: "var(--radius-full)", fontSize: 10, fontWeight: 700, color: "#f87171", background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.35)" }}>
               <AlertCircle size={10} /> {deadlineInfo.label}
@@ -412,13 +500,6 @@ const GridTaskCard: React.FC<{
               Chưa có deadline
             </span>
           )}
-
-          {/* Completion timestamp */}
-          {isDone && task.completedAt && (
-            <span style={{ fontSize: 10, color: "var(--color-success)", fontWeight: 600, display: "flex", alignItems: "center", gap: 3 }}>
-              ✓ {fmtCompletedAt(task.completedAt)}
-            </span>
-          )}
         </div>
 
         {/* Tags */}
@@ -437,6 +518,7 @@ const GridTaskCard: React.FC<{
 };
 
 /* ── Task Card Router (Grid vs List wrapper) ───────────────────────────────── */
+
 const TaskCard: React.FC<{
   task: Task; isOverdue: boolean; index: number; viewMode: "grid" | "list";
   onEdit: () => void; onDelete: () => void; onToggle: () => void;
@@ -452,7 +534,7 @@ const TaskCard: React.FC<{
 /* ── Main Page ────────────────────────────────────────────────────────────── */
 export const TasksPage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [filterStatus, setFilterStatus] = useState<"" | "pending" | "done">("");
+  const [filterStatus, setFilterStatus] = useState<"" | "pending" | "done" | "done_late">("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -475,9 +557,11 @@ export const TasksPage: React.FC = () => {
 
   const { data: allDayData } = useTasks({ plannedDate: dateStr });
   const allDayTasks = allDayData?.data ?? [];
-  const doneCount  = allDayTasks.filter(t => t.status === "done").length;
-  const totalCount = allDayTasks.length;
-  const pendingCount = totalCount - doneCount;
+  const doneCount     = allDayTasks.filter(t => t.status === "done").length;
+  const doneLateCount = allDayTasks.filter(t => t.status === "done_late").length;
+  const totalCount    = allDayTasks.length;
+  // Tasks remaining to do (not completed in any form)
+  const pendingCount  = totalCount - doneCount - doneLateCount;
 
   const navigate = (delta: number) => {
     const d = new Date(selectedDate);
@@ -505,14 +589,30 @@ export const TasksPage: React.FC = () => {
   };
 
   const handleToggle = (task: Task) => {
-    if (task.status === "done") uncompleteTask.mutate(task.id);
+    // Both "done" and "done_late" → uncomplete back to pending
+    if (task.status === "done" || task.status === "done_late") uncompleteTask.mutate(task.id);
     else completeTask.mutate(task.id);
   };
 
-  const FILTERS = [
-    { value: "" as const,        label: "Tất cả",  count: totalCount,   icon: <ListChecks size={13} /> },
-    { value: "pending" as const, label: "Đang làm", count: pendingCount, icon: <Clock4 size={13} /> },
-    { value: "done" as const,    label: "Xong",     count: doneCount,    icon: <CheckCircle2 size={13} /> },
+  const FILTERS: Array<{
+    value: "" | "pending" | "done" | "done_late";
+    label: string;
+    count: number;
+    icon: React.ReactNode;
+    activeColor?: string;
+    activeShadow?: string;
+  }> = [
+    { value: "",          label: "Tất cả",         count: totalCount,    icon: <ListChecks size={13} /> },
+    { value: "pending",   label: "Đang làm",        count: pendingCount,  icon: <Clock4 size={13} /> },
+    { value: "done",      label: "Đã hoàn thành",   count: doneCount,     icon: <CheckCircle2 size={13} /> },
+    {
+      value: "done_late",
+      label: "Hoàn thành trễ",
+      count: doneLateCount,
+      icon: <AlarmClock size={13} />,
+      activeColor: "#F97316",
+      activeShadow: "0 2px 8px rgba(249,115,22,0.4)",
+    },
   ];
 
   return (
@@ -654,7 +754,7 @@ export const TasksPage: React.FC = () => {
 
             {/* Right: Progress + Add */}
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              {totalCount > 0 && <ProgressRing done={doneCount} total={totalCount} />}
+              {totalCount > 0 && <ProgressRing done={doneCount + doneLateCount} total={totalCount} />}
               <Button variant="primary" size="sm"
                 leftIcon={<Plus size={15} />}
                 onClick={() => { setEditingTask(null); setIsModalOpen(true); }}>
@@ -677,6 +777,8 @@ export const TasksPage: React.FC = () => {
           }}>
             {FILTERS.map(f => {
               const active = filterStatus === f.value;
+              const btnColor = active ? (f.activeColor ?? "var(--accent-primary)") : "transparent";
+              const btnShadow = active ? (f.activeShadow ?? "0 2px 8px var(--accent-glow)") : "none";
               return (
                 <button
                   key={f.value}
@@ -686,13 +788,14 @@ export const TasksPage: React.FC = () => {
                     padding: "6px 14px",
                     borderRadius: "var(--radius-md)",
                     border: "none",
-                    background: active ? "var(--accent-primary)" : "transparent",
+                    background: btnColor,
                     color: active ? "#fff" : "var(--text-secondary)",
                     cursor: "pointer",
                     fontWeight: active ? 600 : 400,
                     fontSize: 13,
                     transition: "all 180ms ease",
-                    boxShadow: active ? "0 2px 8px var(--accent-glow)" : "none",
+                    boxShadow: btnShadow,
+                    fontFamily: "var(--font-sans)",
                   }}
                 >
                   <span style={{ opacity: active ? 1 : 0.6 }}>{f.icon}</span>
@@ -712,6 +815,7 @@ export const TasksPage: React.FC = () => {
                 </button>
               );
             })}
+
           </div>
 
           {/* View Mode Switcher */}
@@ -790,12 +894,15 @@ export const TasksPage: React.FC = () => {
             <EmptyState
               icon={filterStatus === "done"
                 ? <CheckCircle2 size={44} />
+                : filterStatus === "done_late"
+                ? <AlarmClock size={44} />
                 : filterStatus === "pending"
                 ? <FilterX size={44} />
                 : <CheckSquare2 size={44} />
               }
               title={
                 filterStatus === "done" ? "Chưa hoàn thành gì hôm nay" :
+                filterStatus === "done_late" ? "Không có task hoàn thành trễ" :
                 filterStatus === "pending" ? "Không còn việc nào đang chờ" :
                 isToday ? "Hôm nay chưa có nhiệm vụ nào" :
                 "Không có nhiệm vụ ngày này"
@@ -806,76 +913,92 @@ export const TasksPage: React.FC = () => {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* Section dividers: pending vs done */}
-            {filterStatus !== "done" && tasks.filter(t => t.status !== "done").length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {filterStatus === "" && tasks.filter(t => t.status === "done").length > 0 && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Clock4 size={13} color="var(--accent-primary)" />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "0.02em" }}>
-                      ĐANG LÀM
-                    </span>
-                  </div>
-                )}
-                <div style={{
-                  display: viewMode === "grid" ? "grid" : "flex",
-                  gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(290px, 1fr))" : undefined,
-                  flexDirection: viewMode === "list" ? "column" : undefined,
-                  gap: 14,
-                }}>
-                  {tasks.filter(t => t.status !== "done").map((task, i) => {
-                    const pd = parsePlannedDate(task.plannedDate);
-                    const isOverdue = !!(pd && pd < new Date(new Date().setHours(0, 0, 0, 0)) && task.status !== "done");
-                    return (
-                      <TaskCard
-                        key={task.id} task={task} isOverdue={isOverdue} index={i}
-                        viewMode={viewMode}
-                        onEdit={() => { setEditingTask(task); setIsModalOpen(true); }}
-                        onDelete={() => handleDelete(task.id)}
-                        onToggle={() => handleToggle(task)}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
-            {/* Done section */}
-            {filterStatus !== "pending" && tasks.filter(t => t.status === "done").length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: filterStatus === "" ? 12 : 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <CheckCircle2 size={13} color="var(--color-success)" />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-success)", letterSpacing: "0.02em" }}>
-                    ĐÃ HOÀN THÀNH ({tasks.filter(t => t.status === "done").length})
-                  </span>
-                  <div style={{ flex: 1, height: 1, background: "var(--border-subtle)" }} />
-                </div>
+            {/* ── Helper: shared grid wrapper ── */}
+            {(() => {
+              const pendingTasks   = tasks.filter(t => t.status === "pending" || t.status === "in_progress");
+              const doneTasks      = tasks.filter(t => t.status === "done");
+              const doneLateTask   = tasks.filter(t => t.status === "done_late");
 
-                <div style={{
-                  display: viewMode === "grid" ? "grid" : "flex",
-                  gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(290px, 1fr))" : undefined,
-                  flexDirection: viewMode === "list" ? "column" : undefined,
-                  gap: 14,
-                }}>
-                  {tasks.filter(t => t.status === "done").map((task, i) => {
-                    const pd = parsePlannedDate(task.plannedDate);
-                    const isOverdue = !!(pd && pd < new Date(new Date().setHours(0, 0, 0, 0)) && task.status !== "done");
-                    return (
-                      <TaskCard
-                        key={task.id} task={task} isOverdue={isOverdue}
-                        index={tasks.filter(t => t.status !== "done").length + i}
-                        viewMode={viewMode}
-                        onEdit={() => { setEditingTask(task); setIsModalOpen(true); }}
-                        onDelete={() => handleDelete(task.id)}
-                        onToggle={() => handleToggle(task)}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+              const gridStyle: React.CSSProperties = {
+                display: viewMode === "grid" ? "grid" : "flex",
+                gridTemplateColumns: viewMode === "grid" ? "repeat(auto-fill, minmax(290px, 1fr))" : undefined,
+                flexDirection: viewMode === "list" ? "column" : undefined,
+                gap: 14,
+              };
+
+              const renderCards = (group: Task[], baseIndex = 0) =>
+                group.map((task, i) => {
+                  const pd = parsePlannedDate(task.plannedDate);
+                  const isOverdue = !!(pd && pd < new Date(new Date().setHours(0, 0, 0, 0)) && task.status !== "done" && task.status !== "done_late");
+                  return (
+                    <TaskCard
+                      key={task.id} task={task} isOverdue={isOverdue}
+                      index={baseIndex + i} viewMode={viewMode}
+                      onEdit={() => { setEditingTask(task); setIsModalOpen(true); }}
+                      onDelete={() => handleDelete(task.id)}
+                      onToggle={() => handleToggle(task)}
+                    />
+                  );
+                });
+
+              return (
+                <>
+                  {/* ── Section 1: Đang làm ── */}
+                  {pendingTasks.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {/* Only show header when "all" tab + other sections also present */}
+                      {filterStatus === "" && (doneTasks.length > 0 || doneLateTask.length > 0) && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <Clock4 size={13} color="var(--accent-primary)" />
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--accent-primary)", letterSpacing: "0.05em" }}>
+                            ĐANG LÀM ({pendingTasks.length})
+                          </span>
+                          <div style={{ flex: 1, height: 1, background: "var(--border-subtle)" }} />
+                        </div>
+                      )}
+                      <div style={gridStyle}>{renderCards(pendingTasks, 0)}</div>
+                    </div>
+                  )}
+
+                  {/* ── Section 2: Đã hoàn thành ── */}
+                  {doneTasks.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {/* Show header when "all" tab OR "done_late" tab (so user sees done vs late split) */}
+                      {(filterStatus === "" || filterStatus === "done_late") && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <CheckCircle2 size={13} color="var(--color-success)" />
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-success)", letterSpacing: "0.05em" }}>
+                            ĐÃ HOÀN THÀNH ({doneTasks.length})
+                          </span>
+                          <div style={{ flex: 1, height: 1, background: "var(--border-subtle)" }} />
+                        </div>
+                      )}
+                      <div style={gridStyle}>{renderCards(doneTasks, pendingTasks.length)}</div>
+                    </div>
+                  )}
+
+                  {/* ── Section 3: Hoàn thành trễ ── */}
+                  {doneLateTask.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {/* Always show header for done_late section — it's distinct */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <AlarmClock size={13} color="#F97316" />
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#F97316", letterSpacing: "0.05em" }}>
+                          HOÀN THÀNH TRỄ ({doneLateTask.length})
+                        </span>
+                        <div style={{ flex: 1, height: 1, background: "rgba(249,115,22,0.25)" }} />
+                      </div>
+                      <div style={gridStyle}>{renderCards(doneLateTask, pendingTasks.length + doneTasks.length)}</div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+
           </div>
         )}
+
 
         <TaskFormModal
           isOpen={isModalOpen}

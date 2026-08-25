@@ -1,4 +1,4 @@
-﻿import api from '../../../lib/api';
+import api from '../../../lib/api';
 import { Tag } from '../../tags/api/tagApi';
 
 export interface Task {
@@ -6,7 +6,7 @@ export interface Task {
   title: string;
   description?: string;
   priority: 'low' | 'medium' | 'high';
-  status: 'pending' | 'in_progress' | 'done' | 'archived';
+  status: 'pending' | 'in_progress' | 'done' | 'done_late' | 'archived';
   deadline?: string;
   isRecurring: boolean;
   recurrenceType?: string;

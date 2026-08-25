@@ -1,4 +1,4 @@
-﻿using LifeBoard.API.Models.DTOs;
+using LifeBoard.API.Models.DTOs;
 using LifeBoard.API.Models.Entities;
 using LifeBoard.API.Repositories.Interfaces;
 using LifeBoard.API.Services.Interfaces;
@@ -48,8 +48,47 @@ public class TaskService(ITaskRepository repository, ILogger<TaskService> logger
     public async Task<TaskDto> CompleteAsync(int id)
     {
         var existing = await _repository.GetByIdAsync(id) ?? throw new KeyNotFoundException("Task not found");
-        await _repository.UpdateStatusAsync(id, "done", DateTime.UtcNow);
+        var now = DateTime.UtcNow;
+
+        var finalStatus = DetermineCompletionStatus(existing, now);
+
+        await _repository.UpdateStatusAsync(id, finalStatus, now);
         return await _repository.GetByIdAsync(id) ?? throw new Exception("Task missing");
+    }
+
+    /// <summary>
+    /// Determines whether a task completed at <paramref name="completedAt"/> should be
+    /// "done" (on time) or "done_late" (past deadline or past planned date).
+    ///
+    /// Rules:
+    ///   1. If the task has a Deadline:
+    ///        - completedAt ≤ Deadline  → "done"
+    ///        - completedAt > Deadline  → "done_late"
+    ///   2. If no Deadline but PlannedDate exists:
+    ///        - completedAt date ≤ PlannedDate date → "done"
+    ///        - completedAt date >  PlannedDate date → "done_late"
+    ///   3. No Deadline, no PlannedDate → always "done"
+    /// </summary>
+    private static string DetermineCompletionStatus(TaskDto task, DateTime completedAt)
+    {
+        // Case 1: Has explicit deadline
+        if (task.Deadline.HasValue)
+        {
+            return completedAt > task.Deadline.Value ? "done_late" : "done";
+        }
+
+        // Case 2: No deadline but has a planned date — compare calendar dates
+        if (task.PlannedDate.HasValue)
+        {
+            // PlannedDate is stored as DATE (no time), interpret as end-of-day UTC boundary.
+            // A task is "late" when the completion date (UTC date) is strictly after the planned date.
+            var plannedDateOnly = DateOnly.FromDateTime(task.PlannedDate.Value);
+            var completedDateOnly = DateOnly.FromDateTime(completedAt);
+            return completedDateOnly > plannedDateOnly ? "done_late" : "done";
+        }
+
+        // Case 3: No deadline, no planned date
+        return "done";
     }
 
     public async Task<TaskDto> UncompleteAsync(int id)

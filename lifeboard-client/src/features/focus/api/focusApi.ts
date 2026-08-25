@@ -5,11 +5,13 @@ export interface FocusSession {
   sessionType: 'stopwatch' | 'pomodoro';
   label?: string;
   startTime: string;
-  endTime: string;
+  endTime?: string;      // null/undefined when session is still active
   durationSeconds: number;
   sessionDate: string;
   splits?: string;
   createdAt: string;
+  stopwatchState?: string;
+  pausedDurationSeconds?: number;
 }
 
 export interface FocusSessionResponse {

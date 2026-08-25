@@ -55,6 +55,8 @@ builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IHabitService, HabitService>();
 builder.Services.AddScoped<IFocusSessionService, FocusSessionService>();
+builder.Services.AddScoped<IStopwatchService, StopwatchService>();
+
 builder.Services.AddScoped<IGoalService, GoalService>();
 builder.Services.AddScoped<IDailyNoteService, DailyNoteService>();
 builder.Services.AddScoped<IMoodEntryService, MoodEntryService>();

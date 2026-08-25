@@ -22,9 +22,17 @@ public class FocusSessionService(IFocusSessionRepository repository) : IFocusSes
         
         var dtos = list.Select(s => new FocusSessionDto
         {
-            Id = s.Id, SessionType = s.SessionType, Label = s.Label, StartTime = s.StartTime,
-            EndTime = s.EndTime, DurationSeconds = s.DurationSeconds, SessionDate = s.SessionDate,
-            Splits = s.Splits, CreatedAt = s.CreatedAt
+            Id = s.Id,
+            SessionType = s.SessionType,
+            Label = s.Label,
+            StartTime = DateTime.SpecifyKind(s.StartTime, DateTimeKind.Utc),
+            EndTime = s.EndTime.HasValue ? DateTime.SpecifyKind(s.EndTime.Value, DateTimeKind.Utc) : null,
+            DurationSeconds = s.DurationSeconds,
+            SessionDate = DateTime.SpecifyKind(s.SessionDate, DateTimeKind.Utc),
+            Splits = s.Splits,
+            CreatedAt = DateTime.SpecifyKind(s.CreatedAt, DateTimeKind.Utc),
+            StopwatchState = s.StopwatchState,
+            PausedDurationSeconds = s.PausedDurationSeconds
         });
         
         return new { data = dtos, totalDurationSeconds = totalDuration };
